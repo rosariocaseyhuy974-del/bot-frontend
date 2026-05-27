@@ -1,0 +1,242 @@
+﻿:root {
+      --bg0: #f8fafc;
+      --bg1: #e2e8f0;
+      --ink: #0f172a;
+      --muted: #475569;
+      --card: rgba(255, 255, 255, 0.65);
+      --line: rgba(15, 23, 42, 0.1);
+      --accent: #0ea5e9;
+      --accent-2: #0369a1;
+      --danger: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background:
+        radial-gradient(1200px 600px at 90% -10%, rgba(14, 165, 233, 0.22), transparent 55%),
+        radial-gradient(900px 500px at -10% 90%, rgba(59, 130, 246, 0.2), transparent 50%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      color: var(--ink);
+      font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      touch-action: none;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      width: 42vmax;
+      height: 42vmax;
+      border-radius: 45% 55% 50% 50%;
+      filter: blur(18px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.5;
+      animation: drift 14s ease-in-out infinite alternate;
+    }
+
+    body::before {
+      top: -16vmax;
+      left: -12vmax;
+      background: radial-gradient(circle at 30% 30%, rgba(125, 211, 252, 0.45), rgba(59, 130, 246, 0.12) 65%, transparent 70%);
+    }
+
+    body::after {
+      bottom: -20vmax;
+      right: -14vmax;
+      animation-duration: 18s;
+      background: radial-gradient(circle at 65% 35%, rgba(147, 197, 253, 0.45), rgba(14, 165, 233, 0.14) 60%, transparent 72%);
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 14px;
+      gap: 14px;
+    }
+
+    .stage {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 24px;
+      border: 1px solid var(--line);
+      background: var(--card);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow:
+        0 12px 32px rgba(15, 23, 42, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      overflow: hidden;
+    }
+
+    .stage::before,
+    .stage::after {
+      content: "";
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .stage::before {
+      width: 220px;
+      height: 220px;
+      top: -90px;
+      right: -40px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08) 65%, transparent 70%);
+      filter: blur(6px);
+    }
+
+    .stage::after {
+      width: 160px;
+      height: 160px;
+      bottom: -60px;
+      left: -30px;
+      background: radial-gradient(circle, rgba(224, 242, 254, 0.45), rgba(186, 230, 253, 0.08) 62%, transparent 70%);
+      filter: blur(7px);
+    }
+
+    .canvas-wrap {
+      position: relative;
+      width: min(100%, calc(100vh - 150px));
+      max-width: 100%;
+      aspect-ratio: var(--canvas-ratio, 1 / 1);
+    }
+
+    .canvas-wrap::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      background: linear-gradient(145deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.03));
+      pointer-events: none;
+      z-index: 3;
+      mix-blend-mode: screen;
+    }
+
+    #editorCanvas,
+    #gestureLayer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+      user-select: none;
+    }
+
+    #gestureLayer {
+      touch-action: none;
+      z-index: 2;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+
+    #doneBtn {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      padding: 15px 16px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      color: #e0f2fe;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow:
+        0 8px 18px rgba(3, 105, 161, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+
+    #doneBtn:active {
+      transform: translateY(1px) scale(0.997);
+      filter: brightness(0.98);
+    }
+
+    #doneBtn:disabled {
+      opacity: 0.48;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .hint {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 3;
+      padding: 9px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.55);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .error {
+      color: var(--danger);
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      min-height: 20px;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+    }
+
+    .brand {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 2px 2px 0;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .brand-badge {
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 9px;
+    }
+
+    @media (max-height: 670px) {
+      .app {
+        padding: 10px;
+        gap: 10px;
+      }
+      .canvas-wrap {
+        width: min(100%, calc(100vh - 130px));
+      }
+    }
+
+    @keyframes drift {
+      0% {
+        transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+      }
+      100% {
+        transform: translate3d(24px, -18px, 0) rotate(14deg) scale(1.08);
+      }
+    }

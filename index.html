@@ -1,0 +1,37 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Telegram WebApp Editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <div class="brand">
+      <span>Collage Editor</span>
+      <span class="brand-badge">Telegram WebApp</span>
+    </div>
+    <div class="stage">
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="editorCanvas" width="1024" height="1024"></canvas>
+        <div id="gestureLayer"></div>
+      </div>
+      <div class="hint">Перемещайте, масштабируйте (pinch), вращайте объект</div>
+    </div>
+
+    <div class="error" id="errorText"></div>
+
+    <div class="controls">
+      <button id="doneBtn" type="button" disabled>Готово</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
