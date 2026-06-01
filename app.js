@@ -15,7 +15,6 @@
   const params = new URLSearchParams(window.location.search);
   const sessionToken = params.get("token");
 
-  // Базовый адрес вашего API шлюза раздачи
   const BASE_API_URL = "https://tackle-unvisited-doorbell.ngrok-free.dev";
 
   let W = 1024;
@@ -130,8 +129,14 @@
     });
 
     manager.on("panmove", (e) => {
-      state.x = gestureStart.x + e.deltaX;
-      state.y = gestureStart.y + e.deltaY;
+      // Динамический пересчет коэффициента масштабирования экрана (Защита от улетания мышки/пальца)
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = W / rect.width;
+      const scaleY = H / rect.height;
+
+      state.x = gestureStart.x + (e.deltaX * scaleX);
+      state.y = gestureStart.y + (e.deltaY * scaleY);
+      
       constrainPosition();
       requestDraw();
     });
@@ -185,7 +190,7 @@
         if (response.ok) {
           setError("");
           if (tg && typeof tg.close === "function") {
-            tg.close(); // Жестко гасим WebView-окно, бот сам пришлет результат
+            tg.close();
           }
         } else {
           const errData = await response.json();
