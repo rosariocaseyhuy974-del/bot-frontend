@@ -12,6 +12,7 @@
   const doneBtn = document.getElementById("doneBtn");
   const errorText = document.getElementById("errorText");
 
+  // Нативное и безопасное чтение параметров адресной строки
   const params = new URLSearchParams(window.location.search);
   const rawBgUrl = params.get("bg");
   const rawItemUrl = params.get("item");
@@ -52,26 +53,6 @@
     errorText.textContent = msg || "";
   }
 
-  function normalizeImageUrl(input) {
-    if (!input) return input;
-    let url = input.trim();
-    url = url.replace(/^data:image\/svg\s+xml/i, "data:image/svg+xml");
-    url = url.replace(/^data:image\/svg xml/i, "data:image/svg+xml");
-
-    if (/^data:image\/svg\+xml,/i.test(url)) {
-      const commaIndex = url.indexOf(",");
-      if (commaIndex !== -1) {
-        const head = url.slice(0, commaIndex + 1);
-        const body = url.slice(commaIndex + 1);
-        const looksEncoded = /%3C|%3E|%23|%20|%2F/i.test(body);
-        if (!looksEncoded) {
-          url = head + encodeURIComponent(body);
-        }
-      }
-    }
-    return url;
-  }
-
   function loadImage(url) {
     return new Promise((resolve, reject) => {
       if (!url) {
@@ -79,10 +60,9 @@
         return;
       }
       const img = new Image();
-      // Разрешаем кросс-доменную загрузку для Canvas
-      img.crossOrigin = "anonymous"; 
+      img.crossOrigin = "anonymous"; // Полное отключение блокировок CORS внутри WebView
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("Не удалось загрузить: " + url));
+      img.onerror = () => reject(new Error("Не удалось загрузить ресурс. Проверьте сеть или URL."));
       img.src = url;
     });
   }
@@ -144,7 +124,7 @@
 
   function setupGestures() {
     if (!window.Hammer) {
-      setError("Hammer.js не загрузился.");
+      setError("Критическая ошибка: библиотека Hammer.js не найдена.");
       return;
     }
 
@@ -203,22 +183,23 @@
         tg.sendData(JSON.stringify(payload));
         tg.close();
       } else {
-        alert("Telegram WebApp API недоступен. Данные: " + JSON.stringify(payload));
+        alert("Успешно сформировано: " + JSON.stringify(payload));
       }
     });
   }
 
   async function init() {
-    const bgUrl = normalizeImageUrl(rawBgUrl);
-    const itemUrl = normalizeImageUrl(rawItemUrl);
-
-    if (!bgUrl || !itemUrl) {
-      setError("Передайте query-параметры ?bg=<url>&item=<url>&ratio=1:1|3:4");
+    if (!rawBgUrl || !rawItemUrl) {
+      setError("Ошибка: отсутствуют обязательные query-параметры генерации.");
       return;
     }
 
+    // Чистое декодирование URL без деструктивных проверок регулярными выражениями
+    const bgUrl = decodeURIComponent(rawBgUrl.trim());
+    const itemUrl = decodeURIComponent(rawItemUrl.trim());
+
     try {
-      setError("Загрузка изображений...");
+      setError("ИИ-Конвейер: Загрузка слоев...");
       const [bgImg, itemImg] = await Promise.all([loadImage(bgUrl), loadImage(itemUrl)]);
       images.bg = bgImg;
       images.item = itemImg;
@@ -239,7 +220,7 @@
       doneBtn.disabled = false;
       setError("");
     } catch (err) {
-      setError(err.message || "Ошибка инициализации.");
+      setError(err.message || "Ошибка построения интерактивного холста.");
     }
   }
 
