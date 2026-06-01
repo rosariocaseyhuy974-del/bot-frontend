@@ -12,21 +12,15 @@
   const doneBtn = document.getElementById("doneBtn");
   const errorText = document.getElementById("errorText");
 
-  // Нативное, быстрое и безопасное извлечение параметров без агрессивных регулярок
   const params = new URLSearchParams(window.location.search);
-  const rawBgUrl = params.get("bg");
-  const rawItemUrl = params.get("item");
-  const ratioParam = (params.get("ratio") || "1:1").trim();
+  const sessionToken = params.get("token");
+
+  // Динамически вычисляем адрес вашего ngrok или локального VDS-сервера
+  // Универсально подходит для любого из 3-х ваших будущих ботов!
+  const API_URL = "https://tackle-unvisited-doorbell.ngrok-free.dev/get_state";
 
   let W = 1024;
   let H = 1024;
-  if (ratioParam === "3:4") {
-    W = 768;
-    H = 1024;
-    canvasWrap.style.setProperty("--canvas-ratio", "3 / 4");
-  } else {
-    canvasWrap.style.setProperty("--canvas-ratio", "1 / 1");
-  }
   canvas.width = W;
   canvas.height = H;
 
@@ -53,17 +47,12 @@
     errorText.textContent = msg || "";
   }
 
-  function loadImage(url) {
+  function loadImage(base64Data) {
     return new Promise((resolve, reject) => {
-      if (!url) {
-        reject(new Error("URL изображения не передан."));
-        return;
-      }
       const img = new Image();
-      img.crossOrigin = "anonymous"; // Важно для беспрепятственного чтения пикселей WebGL/Canvas
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("Не удалось загрузить ресурс. Проверьте сеть локального ПК."));
-      img.src = url;
+      img.onerror = () => reject(new Error("Критическая ошибка десериализации потока Base64."));
+      img.src = base64Data;
     });
   }
 
@@ -123,11 +112,6 @@
   }
 
   function setupGestures() {
-    if (!window.Hammer) {
-      setError("Критическая ошибка: библиотека Hammer.js не подключена.");
-      return;
-    }
-
     const manager = new Hammer.Manager(gestureLayer);
     const pan = new Hammer.Pan({ threshold: 0, pointers: 0 });
     const pinch = new Hammer.Pinch({ threshold: 0 });
@@ -183,23 +167,41 @@
         tg.sendData(JSON.stringify(payload));
         tg.close();
       } else {
-        alert("Успешно сформировано: " + JSON.stringify(payload));
+        alert("Сгенерировано: " + JSON.stringify(payload));
       }
     });
   }
 
   async function init() {
-    if (!rawBgUrl || !rawItemUrl) {
-      setError("Ошибка: отсутствуют обязательные query-параметры генерации.");
+    if (!sessionToken) {
+      setError("Критическая ошибка: токен сессии WebApp пуст.");
       return;
     }
 
-    const bgUrl = decodeURIComponent(rawBgUrl.trim());
-    const itemUrl = decodeURIComponent(rawItemUrl.trim());
-
     try {
-      setError("ИИ-Конвейер: Подключение к локальной ноде...");
-      const [bgImg, itemImg] = await Promise.all([loadImage(bgUrl), loadImage(itemUrl)]);
+      setError("Синхронизация сессии ИИ-станка...");
+      
+      // Выполняем один чистый cross-origin POST запрос к локальной СУБД/RAM за картинками
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true"
+        },
+        body: JSON.stringify({ token: sessionToken })
+      });
+
+      if (!response.ok) {
+        throw new Error("Сервер вернул ошибку авторизации сессии.");
+      }
+
+      const storeData = await response.json();
+      
+      const [bgImg, itemImg] = await Promise.all([
+        loadImage(storeData.bg),
+        loadImage(storeData.item)
+      ]);
+
       images.bg = bgImg;
       images.item = itemImg;
 
