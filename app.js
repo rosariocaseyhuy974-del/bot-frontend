@@ -12,6 +12,7 @@
   const doneBtn = document.getElementById("doneBtn");
   const errorText = document.getElementById("errorText");
 
+  // Нативное, быстрое и безопасное извлечение параметров без агрессивных регулярок
   const params = new URLSearchParams(window.location.search);
   const rawBgUrl = params.get("bg");
   const rawItemUrl = params.get("item");
@@ -59,9 +60,9 @@
         return;
       }
       const img = new Image();
-      img.crossOrigin = "anonymous"; // Полное снятие ограничений CORS для локальных Data URL ресурсов
+      img.crossOrigin = "anonymous"; // Важно для беспрепятственного чтения пикселей WebGL/Canvas
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("Не удалось загрузить ресурс. Проверьте валидность строки Base64."));
+      img.onerror = () => reject(new Error("Не удалось загрузить ресурс. Проверьте сеть локального ПК."));
       img.src = url;
     });
   }
@@ -123,7 +124,7 @@
 
   function setupGestures() {
     if (!window.Hammer) {
-      setError("Критическая ошибка: библиотека Hammer.js не найдена.");
+      setError("Критическая ошибка: библиотека Hammer.js не подключена.");
       return;
     }
 
@@ -193,12 +194,11 @@
       return;
     }
 
-    // Декодируем URL и восстанавливаем корректные бинарные пробелы в Base64 строках
-    const bgUrl = decodeURIComponent(rawBgUrl.trim()).replace(/ /g, "+");
-    const itemUrl = decodeURIComponent(rawItemUrl.trim()).replace(/ /g, "+");
+    const bgUrl = decodeURIComponent(rawBgUrl.trim());
+    const itemUrl = decodeURIComponent(rawItemUrl.trim());
 
     try {
-      setError("ИИ-Конвейер: Десериализация слоев...");
+      setError("ИИ-Конвейер: Подключение к локальной ноде...");
       const [bgImg, itemImg] = await Promise.all([loadImage(bgUrl), loadImage(itemUrl)]);
       images.bg = bgImg;
       images.item = itemImg;
