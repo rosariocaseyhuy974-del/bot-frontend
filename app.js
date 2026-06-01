@@ -71,33 +71,27 @@
     ctx.translate(state.x, state.y);
     ctx.rotate((state.angle * Math.PI) / 180);
     ctx.scale(state.scale, state.scale);
-    ctx.drawImage(images.item, -itemW / 2, -itemH / 2);
+    
+    const aspect = itemW / itemH;
+    let targetW = itemW;
+    let targetH = itemH;
+    
+    if (itemW > itemH) {
+      targetW = 358; 
+      targetH = 358 / aspect;
+    } else {
+      targetH = 358;
+      targetW = 358 * aspect;
+    }
+    
+    ctx.drawImage(images.item, -targetW / 2, -targetH / 2, targetW, targetH);
     ctx.restore();
   }
 
   function constrainPosition() {
     if (!images.item) return;
-
-    const itemW = images.item.width * state.scale;
-    const itemH = images.item.height * state.scale;
-    const rad = (state.angle * Math.PI) / 180;
-    const cos = Math.abs(Math.cos(rad));
-    const sin = Math.abs(Math.sin(rad));
-
-    const halfX = (itemW * cos + itemH * sin) / 2;
-    const halfY = (itemW * sin + itemH * cos) / 2;
-
-    if (halfX * 2 >= W) {
-      state.x = W / 2;
-    } else {
-      state.x = Math.min(W - halfX, Math.max(halfX, state.x));
-    }
-
-    if (halfY * 2 >= H) {
-      state.y = H / 2;
-    } else {
-      state.y = Math.min(H - halfY, Math.max(halfY, state.y));
-    }
+    state.x = Math.min(W, Math.max(0, state.x));
+    state.y = Math.min(H, Math.max(0, state.y));
   }
 
   let rafId = 0;
@@ -114,7 +108,6 @@
   }
 
   function setupGestures() {
-    // НАСТРОЙКА СЕНСОРА: Отключаем аппаратные фильтры задержки WebView
     const manager = new Hammer.Manager(gestureLayer, {
       touchAction: 'none'
     });
@@ -134,11 +127,8 @@
 
     manager.on("panmove", (e) => {
       const rect = canvas.getBoundingClientRect();
-      
-      // ЖЕСТКИЙ ПЕРЕСЧЕТ ДЛЯ СЕНСОРА: Учитываем плотность пикселей экрана Retina/OLED
-      const dpiMultiplier = window.devicePixelRatio || 1;
-      const scaleX = (W / rect.width);
-      const scaleY = (H / rect.height);
+      const scaleX = W / rect.width;
+      const scaleY = H / rect.height;
 
       state.x = gestureStart.x + (e.deltaX * scaleX);
       state.y = gestureStart.y + (e.deltaY * scaleY);
