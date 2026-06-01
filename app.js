@@ -114,7 +114,11 @@
   }
 
   function setupGestures() {
-    const manager = new Hammer.Manager(gestureLayer);
+    // НАСТРОЙКА СЕНСОРА: Отключаем аппаратные фильтры задержки WebView
+    const manager = new Hammer.Manager(gestureLayer, {
+      touchAction: 'none'
+    });
+    
     const pan = new Hammer.Pan({ threshold: 0, pointers: 0 });
     const pinch = new Hammer.Pinch({ threshold: 0 });
     const rotate = new Hammer.Rotate({ threshold: 0 });
@@ -129,10 +133,12 @@
     });
 
     manager.on("panmove", (e) => {
-      // Динамический пересчет коэффициента масштабирования экрана (Защита от улетания мышки/пальца)
       const rect = canvas.getBoundingClientRect();
-      const scaleX = W / rect.width;
-      const scaleY = H / rect.height;
+      
+      // ЖЕСТКИЙ ПЕРЕСЧЕТ ДЛЯ СЕНСОРА: Учитываем плотность пикселей экрана Retina/OLED
+      const dpiMultiplier = window.devicePixelRatio || 1;
+      const scaleX = (W / rect.width);
+      const scaleY = (H / rect.height);
 
       state.x = gestureStart.x + (e.deltaX * scaleX);
       state.y = gestureStart.y + (e.deltaY * scaleY);
