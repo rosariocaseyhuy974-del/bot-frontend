@@ -170,7 +170,6 @@
       };
 
       try {
-        // Прямой сквозной POST-запрос с координатами, обходящий мобильные блокировки Telegram
         const response = await fetch(`${BASE_API_URL}/submit_coords`, {
           method: "POST",
           headers: {
@@ -186,7 +185,7 @@
         if (response.ok) {
           setError("");
           if (tg && typeof tg.close === "function") {
-            tg.close(); // Намертво гасим WebView окно на смартфоне
+            tg.close(); // Жестко гасим WebView-окно, бот сам пришлет результат
           }
         } else {
           const errData = await response.json();
