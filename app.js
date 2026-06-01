@@ -15,9 +15,8 @@
   const params = new URLSearchParams(window.location.search);
   const sessionToken = params.get("token");
 
-  // Динамически вычисляем адрес вашего ngrok или локального VDS-сервера
-  // Универсально подходит для любого из 3-х ваших будущих ботов!
-  const API_URL = "https://tackle-unvisited-doorbell.ngrok-free.dev/get_state";
+  // Базовый адрес вашего API шлюза раздачи
+  const BASE_API_URL = "https://tackle-unvisited-doorbell.ngrok-free.dev";
 
   let W = 1024;
   let H = 1024;
@@ -49,6 +48,10 @@
 
   function loadImage(base64Data) {
     return new Promise((resolve, reject) => {
+      if (!base64Data) {
+        reject(new Error("Поток Base64 пуст."));
+        return;
+      }
       const img = new Image();
       img.onload = () => resolve(img);
       img.onerror = () => reject(new Error("Критическая ошибка десериализации потока Base64."));
@@ -155,7 +158,10 @@
   }
 
   function initDoneButton() {
-    doneBtn.addEventListener("click", () => {
+    doneBtn.addEventListener("click", async () => {
+      doneBtn.disabled = true;
+      setError("Сохранение слоев фабрики...");
+
       const payload = {
         x: Math.round(state.x),
         y: Math.round(state.y),
@@ -163,11 +169,32 @@
         angle: Math.round(state.angle),
       };
 
-      if (tg && typeof tg.sendData === "function") {
-        tg.sendData(JSON.stringify(payload));
-        tg.close();
-      } else {
-        alert("Сгенерировано: " + JSON.stringify(payload));
+      try {
+        // Прямой сквозной POST-запрос с координатами, обходящий мобильные блокировки Telegram
+        const response = await fetch(`${BASE_API_URL}/submit_coords`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true"
+          },
+          body: JSON.stringify({
+            token: sessionToken,
+            coords: payload
+          })
+        });
+
+        if (response.ok) {
+          setError("");
+          if (tg && typeof tg.close === "function") {
+            tg.close(); // Намертво гасим WebView окно на смартфоне
+          }
+        } else {
+          const errData = await response.json();
+          throw new Error(errData.error || "Ошибка шлюза СУБД.");
+        }
+      } catch (err) {
+        doneBtn.disabled = false;
+        setError("Ошибка передачи: " + err.message);
       }
     });
   }
@@ -181,8 +208,7 @@
     try {
       setError("Синхронизация сессии ИИ-станка...");
       
-      // Выполняем один чистый cross-origin POST запрос к локальной СУБД/RAM за картинками
-      const response = await fetch(API_URL, {
+      const response = await fetch(`${BASE_API_URL}/get_state`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
