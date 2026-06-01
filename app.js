@@ -12,7 +12,6 @@
   const doneBtn = document.getElementById("doneBtn");
   const errorText = document.getElementById("errorText");
 
-  // Нативное и безопасное чтение параметров адресной строки
   const params = new URLSearchParams(window.location.search);
   const rawBgUrl = params.get("bg");
   const rawItemUrl = params.get("item");
@@ -60,9 +59,9 @@
         return;
       }
       const img = new Image();
-      img.crossOrigin = "anonymous"; // Полное отключение блокировок CORS внутри WebView
+      img.crossOrigin = "anonymous"; // Полное снятие ограничений CORS для локальных Data URL ресурсов
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("Не удалось загрузить ресурс. Проверьте сеть или URL."));
+      img.onerror = () => reject(new Error("Не удалось загрузить ресурс. Проверьте валидность строки Base64."));
       img.src = url;
     });
   }
@@ -194,12 +193,12 @@
       return;
     }
 
-    // Чистое декодирование URL без деструктивных проверок регулярными выражениями
-    const bgUrl = decodeURIComponent(rawBgUrl.trim());
-    const itemUrl = decodeURIComponent(rawItemUrl.trim());
+    // Декодируем URL и восстанавливаем корректные бинарные пробелы в Base64 строках
+    const bgUrl = decodeURIComponent(rawBgUrl.trim()).replace(/ /g, "+");
+    const itemUrl = decodeURIComponent(rawItemUrl.trim()).replace(/ /g, "+");
 
     try {
-      setError("ИИ-Конвейер: Загрузка слоев...");
+      setError("ИИ-Конвейер: Десериализация слоев...");
       const [bgImg, itemImg] = await Promise.all([loadImage(bgUrl), loadImage(itemUrl)]);
       images.bg = bgImg;
       images.item = itemImg;
