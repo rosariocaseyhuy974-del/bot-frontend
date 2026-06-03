@@ -1,4 +1,4 @@
-﻿// Финальный интерактивный холст WebApp конструктора v6.0 под ИИ-конвейер ленты ассетов
+﻿// Финальный интерактивный холст WebApp конструктора v6.3 с изолированной матрицей жестов
 (function () {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) {
@@ -27,10 +27,11 @@
   canvas.width = W;
   canvas.height = H;
 
+  // Изначальные эталонные координаты
   const state = {
     x: W / 2,
     y: H / 2,
-    scale: 1,
+    scale: 1.0,
     angle: 0,
   };
 
@@ -77,6 +78,7 @@
     const itemH = images.item.height;
 
     ctx.save();
+    // Математический перенос и отрисовка слоя Pillow
     ctx.translate(state.x, state.y);
     ctx.rotate((state.angle * Math.PI) / 180);
     ctx.scale(state.scale, state.scale);
@@ -85,7 +87,6 @@
     let targetW = itemW;
     let targetH = itemH;
     
-    // Отрисовка с сохранением пропорций под Pillow-бекинг
     if (itemW > itemH) {
       targetW = 358; 
       targetH = 358 / aspect;
@@ -123,18 +124,23 @@
       return;
     }
 
+    // Жесткая привязка touch-action для блокировки нативного скролла браузера
+    gestureLayer.style.touchAction = "none";
+
     const manager = new Hammer.Manager(gestureLayer, {
       touchAction: 'none'
     });
     
-    const pan = new Hammer.Pan({ threshold: 0, pointers: 0 });
+    // Инициализируем распознаватели жестов
+    const pan = new Hammer.Pan({ threshold: 0, pointers: 1 });
     const pinch = new Hammer.Pinch({ threshold: 0 });
     const rotate = new Hammer.Rotate({ threshold: 0 });
 
-    pinch.recognizeWith([pan, rotate]);
-    rotate.recognizeWith([pan, pinch]);
+    // Настраиваем одновременное распознавание для двух пальцев
+    pinch.recognizeWith(rotate);
     manager.add([pan, pinch, rotate]);
 
+    // --- ЛОГИКА ПЕРЕМЕЩЕНИЯ (ОДИН ПАЛЕЦ) ---
     manager.on("panstart", () => {
       gestureStart.x = state.x;
       gestureStart.y = state.y;
@@ -152,23 +158,25 @@
       requestDraw();
     });
 
+    // --- ЛОГИКА МАСШТАБИРОВАНИЯ (ДВА ПАЛЬЦА - ИЗОЛИРОВАННАЯ) ---
     manager.on("pinchstart", () => {
       gestureStart.scale = state.scale;
     });
 
     manager.on("pinchmove", (e) => {
+      // 🛡 СУПЕР-ФИКС: Меняем только масштаб, координаты x и y остаются неприкосновенными!
       state.scale = clampScale(gestureStart.scale * e.scale);
-      constrainPosition();
       requestDraw();
     });
 
+    // --- ЛОГИКА ВРАЩЕНИЯ (ДВА ПАЛЬЦА - ИЗОЛИРОВАННАЯ) ---
     manager.on("rotatestart", () => {
       gestureStart.angle = state.angle;
     });
 
     manager.on("rotatemove", (e) => {
-      state.angle = gestureStart.angle + e.rotation;
-      constrainPosition();
+      // 🛡 СУПЕР-ФИКС: Крутим строго вокруг собственной оси ассета, игнорируя динамический pivot Hammer.js
+      state.angle = (gestureStart.angle + e.rotation) % 360;
       requestDraw();
     });
   }
@@ -184,14 +192,8 @@
       const itemImg = await loadImage(assetData.b64);
       images.item = itemImg;
 
-      // Сброс координат в центр при выборе нового предмета
-      state.x = W / 2;
-      state.y = H / 2;
-      state.angle = 0;
-
-      const maxStartSize = W * 0.35;
-      const fitScale = maxStartSize / Math.max(itemImg.width, itemImg.height);
-      state.scale = clampScale(fitScale);
+      // 🛡 UX-УЛУЧШЕНИЕ: Мы БОЛЬШЕ НЕ СБРАСЫВАЕМ координаты x, y и поворот в ноль, 
+      // чтобы пользователь мог бесшовно примерять разные шляпы на одно и то же настроенное место.
       
       // Визуальная подсветка выбранной карточки на витрине
       document.querySelectorAll(".asset-card").forEach((card, i) => {
@@ -210,7 +212,7 @@
   function buildWardrobeCarouselUI() {
     if (!assetsScrollLane) return;
 
-    // Зачищаем старые карточки, оставляя только элемент добавления своего предмета (первый дочерний узел)
+    // Зачищаем старые карточки, оставляя только элемент добавления своего предмета
     const uploadWrapper = assetsScrollLane.querySelector(".upload-card-wrapper");
     assetsScrollLane.innerHTML = "";
     if (uploadWrapper) {
@@ -227,7 +229,6 @@
       
       card.appendChild(img);
       
-      // Навешиваем клик на карточку
       card.onclick = () => {
         switchActiveAsset(index);
       };
@@ -265,10 +266,7 @@
             b64: resData.item_b64
           };
           
-          // Вставляем кастомную вырезанную вещь в начало списка
           globalAssetsPack.unshift(newAsset);
-          
-          // Перестраиваем карусель карточек и активируем добавленный предмет
           buildWardrobeCarouselUI();
           await switchActiveAsset(0);
         } catch (err) {
@@ -360,6 +358,7 @@
       images.bg = bgImg;
       images.item = itemImg;
 
+      // Первичная центровка
       state.x = W / 2;
       state.y = H / 2;
       state.angle = 0;
@@ -369,7 +368,7 @@
       state.scale = clampScale(fitScale);
 
       setupGestures();
-      buildWardrobeCarouselUI(); // Инициализация ленты
+      buildWardrobeCarouselUI();
       initCustomItemUploader();
       initDoneButton();
 
