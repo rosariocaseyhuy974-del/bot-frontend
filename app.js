@@ -1,4 +1,5 @@
-﻿(function () {
+﻿// Оригинальный интерактивный холст WebApp конструктора v6.0
+(function () {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) {
     tg.ready();
@@ -12,9 +13,16 @@
   const doneBtn = document.getElementById("doneBtn");
   const errorText = document.getElementById("errorText");
 
+  // Извлечение UI-элементов управления каруселью гардероба v6.0
+  const prevBtn = document.getElementById("prevBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const wardrobeControls = document.getElementById("wardrobeControls");
+  const customItemInput = document.getElementById("customItemInput");
+
   const params = new URLSearchParams(window.location.search);
   const sessionToken = params.get("token");
 
+  // Базовый адрес туннеля, синхронизированный с config.py
   const BASE_API_URL = "https://tackle-unvisited-doorbell.ngrok-free.dev";
 
   let W = 1024;
@@ -40,6 +48,10 @@
     bg: null,
     item: null,
   };
+
+  // Глобальный пакет гардеробной сессии
+  let globalAssetsPack = [];
+  let currentAssetIndex = 0;
 
   function setError(msg) {
     errorText.textContent = msg || "";
@@ -76,6 +88,7 @@
     let targetW = itemW;
     let targetH = itemH;
     
+    // Отрисовка с сохранением пропорций впекания Pillow
     if (itemW > itemH) {
       targetW = 358; 
       targetH = 358 / aspect;
@@ -158,16 +171,107 @@
     });
   }
 
+  // Динамическое переключение элементов внутри активного пакета WebApp
+  async function switchActiveAsset(index) {
+    if (!globalAssetsPack || globalAssetsPack.length === 0) return;
+    try {
+      setError("Загрузка модели...");
+      const assetData = globalAssetsPack[index];
+      const itemImg = await loadImage(assetData.b64);
+      images.item = itemImg;
+
+      // Автоматический подгон масштаба под пропорции ИИ-витрины
+      const maxStartSize = W * 0.35;
+      const fitScale = maxStartSize / Math.max(itemImg.width, itemImg.height);
+      state.scale = clampScale(fitScale);
+      
+      setError("");
+      requestDraw();
+    } catch (err) {
+      setError("Ошибка переключения: " + err.message);
+    }
+  }
+
+  function initWardrobeCarousel() {
+    if (!prevBtn || !nextBtn) return;
+    
+    if (globalAssetsPack.length <= 1) {
+      if (prevBtn.style) prevBtn.style.display = "none";
+      if (nextBtn.style) nextBtn.style.display = "none";
+      return;
+    }
+
+    prevBtn.addEventListener("click", () => {
+      currentAssetIndex = (currentAssetIndex - 1 + globalAssetsPack.length) % globalAssetsPack.length;
+      switchActiveAsset(currentAssetIndex);
+    });
+
+    nextBtn.addEventListener("click", () => {
+      currentAssetIndex = (currentAssetIndex + 1) % globalAssetsPack.length;
+      switchActiveAsset(currentAssetIndex);
+    });
+  }
+
+  // Интеграция обработчика загрузки «Своего предмета» через WebApp API
+  function initCustomItemUploader() {
+    if (!customItemInput) return;
+    customItemInput.addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      setError("ИИ очищает фон ассета на CPU...");
+      const reader = new FileReader();
+      reader.onload = async function (evt) {
+        const base64Raw = evt.target.result;
+        try {
+          const response = await fetch(`${BASE_API_URL}/upload_custom`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              token: sessionToken,
+              image_b64: base64Raw
+            })
+          });
+
+          if (!response.ok) throw new Error("ИИ не смог сегментировать объект.");
+          const resData = await response.json();
+          
+          // Внедряем вырезанную вещь в начало карусели
+          const newAsset = {
+            path: resData.path,
+            b64: resData.item_b64
+          };
+          globalAssetsPack.unshift(newAsset);
+          currentAssetIndex = 0;
+          
+          if (prevBtn && nextBtn && globalAssetsPack.length > 1) {
+            prevBtn.style.display = "inline-block";
+            nextBtn.style.display = "inline-block";
+          }
+          
+          await switchActiveAsset(0);
+        } catch (err) {
+          setError("Сбой ИИ-вырезки: " + err.message);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   function initDoneButton() {
     doneBtn.addEventListener("click", async () => {
       doneBtn.disabled = true;
-      setError("Сохранение слоев фабрики...");
+      setError("Запекание слоев на ИИ-холсте...");
+
+      // Извлекаем точный путь выбранного на витрине или загруженного предмета
+      const currentAssetPath = globalAssetsPack[currentAssetIndex] ? globalAssetsPack[currentAssetIndex].path : "";
 
       const payload = {
         x: Math.round(state.x),
         y: Math.round(state.y),
         scale: Number(state.scale.toFixed(4)),
         angle: Math.round(state.angle),
+        chosen_path: currentAssetPath
       };
 
       try {
@@ -211,7 +315,7 @@
       const response = await fetch(`${BASE_API_URL}/get_state`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "application/json": "application/json",
           "ngrok-skip-browser-warning": "true"
         },
         body: JSON.stringify({ token: sessionToken })
@@ -223,9 +327,16 @@
 
       const storeData = await response.json();
       
+      // ИСПРАВЛЕНИЕ РАССИНХРОНА: Вытаскиваем массив assets_pack вместо несуществующего item
+      globalAssetsPack = storeData.assets_pack || [];
+      if (globalAssetsPack.length === 0) {
+        throw new Error("ИИ-витрина этой категории пуста. Добавьте модели через /admin.");
+      }
+
+      // Асинхронно подгружаем силуэт питомца и первый предмет из карусели
       const [bgImg, itemImg] = await Promise.all([
         loadImage(storeData.bg),
-        loadImage(storeData.item)
+        loadImage(globalAssetsPack[0].b64)
       ]);
 
       images.bg = bgImg;
@@ -242,6 +353,8 @@
 
       draw();
       setupGestures();
+      initWardrobeCarousel();
+      initCustomItemUploader();
       initDoneButton();
 
       doneBtn.disabled = false;
