@@ -1,4 +1,4 @@
-﻿// Финальный интерактивный холст WebApp конструктора v6.3 с изолированной матрицей жестов
+﻿// Финальный интерактивный холст WebApp конструктора v6.4 с абсолютной изоляцией осей жестов
 (function () {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) {
@@ -35,6 +35,7 @@
     angle: 0,
   };
 
+  // Внутренние буферы для хранения демпфированных дельт жестов
   const gestureStart = {
     x: state.x,
     y: state.y,
@@ -78,7 +79,7 @@
     const itemH = images.item.height;
 
     ctx.save();
-    // Математический перенос и отрисовка слоя Pillow
+    // Математический перенос и отрисовка слоя Pillow строго вокруг собственного центра ассета
     ctx.translate(state.x, state.y);
     ctx.rotate((state.angle * Math.PI) / 180);
     ctx.scale(state.scale, state.scale);
@@ -124,29 +125,31 @@
       return;
     }
 
-    // Жесткая привязка touch-action для блокировки нативного скролла браузера
+    // Блокировка системного скролла и отскоков браузера на мобильных устройствах
     gestureLayer.style.touchAction = "none";
 
     const manager = new Hammer.Manager(gestureLayer, {
       touchAction: 'none'
     });
     
-    // Инициализируем распознаватели жестов
+    // Инициализируем изолированные распознаватели
     const pan = new Hammer.Pan({ threshold: 0, pointers: 1 });
     const pinch = new Hammer.Pinch({ threshold: 0 });
     const rotate = new Hammer.Rotate({ threshold: 0 });
 
-    // Настраиваем одновременное распознавание для двух пальцев
+    // Позволяем масштабированию и вращению работать одновременно на двух пальцах
     pinch.recognizeWith(rotate);
     manager.add([pan, pinch, rotate]);
 
-    // --- ЛОГИКА ПЕРЕМЕЩЕНИЯ (ОДИН ПАЛЕЦ) ---
+    // --- ЛОГИКА ПЕРЕМЕЩЕНИЯ (СТРОГО ОДИН ПАЛЕЦ) ---
     manager.on("panstart", () => {
       gestureStart.x = state.x;
       gestureStart.y = state.y;
     });
 
     manager.on("panmove", (e) => {
+      if (e.pointers.length > 1) return; // Игнорируем pan, если приложено больше одного пальца
+
       const rect = canvas.getBoundingClientRect();
       const scaleX = W / rect.width;
       const scaleY = H / rect.height;
@@ -158,25 +161,31 @@
       requestDraw();
     });
 
-    // --- ЛОГИКА МАСШТАБИРОВАНИЯ (ДВА ПАЛЬЦА - ИЗОЛИРОВАННАЯ) ---
-    manager.on("pinchstart", () => {
+    // --- ЛОГИКА МАСШТАБИРОВАНИЯ (БЕЗ РЫВКОВ) ---
+    manager.on("pinchstart", (e) => {
       gestureStart.scale = state.scale;
     });
 
     manager.on("pinchmove", (e) => {
-      // 🛡 СУПЕР-ФИКС: Меняем только масштаб, координаты x и y остаются неприкосновенными!
+      // Изменение масштаба высчитывается как чистый коэффициент без влияния на оси X/Y
       state.scale = clampScale(gestureStart.scale * e.scale);
       requestDraw();
     });
 
-    // --- ЛОГИКА ВРАЩЕНИЯ (ДВА ПАЛЬЦА - ИЗОЛИРОВАННАЯ) ---
-    manager.on("rotatestart", () => {
+    // --- ЛОГИКА ВРАЩЕНИЯ С ДЕМПФИРОВАНИЕМ СТАРТОВОГО СДВИГА ---
+    let initialRotationOffset = 0;
+
+    manager.on("rotatestart", (e) => {
       gestureStart.angle = state.angle;
+      // 🛡 СУПЕР-ФИКС: Запоминаем изначальный системный угол Hammer в момент касания стекла
+      initialRotationOffset = e.rotation;
     });
 
     manager.on("rotatemove", (e) => {
-      // 🛡 СУПЕР-ФИКС: Крутим строго вокруг собственной оси ассета, игнорируя динамический pivot Hammer.js
-      state.angle = (gestureStart.angle + e.rotation) % 360;
+      // 🛡 СУПЕР-ФИКС: Вычитаем стартовый сдвиг из текущего вращения. 
+      // Картинка начнет вращаться плавно именно с того угла, на котором она находилась, без скачков!
+      const cleanDeltaRotation = e.rotation - initialRotationOffset;
+      state.angle = (gestureStart.angle + cleanDeltaRotation) % 360;
       requestDraw();
     });
   }
@@ -192,10 +201,8 @@
       const itemImg = await loadImage(assetData.b64);
       images.item = itemImg;
 
-      // 🛡 UX-УЛУЧШЕНИЕ: Мы БОЛЬШЕ НЕ СБРАСЫВАЕМ координаты x, y и поворот в ноль, 
-      // чтобы пользователь мог бесшовно примерять разные шляпы на одно и то же настроенное место.
+      // UX-улучшение: Координаты и угол сохраняются для бесшовной примерки разных моделей
       
-      // Визуальная подсветка выбранной карточки на витрине
       document.querySelectorAll(".asset-card").forEach((card, i) => {
         if (i === index) card.classList.add("active");
         else card.classList.remove("active");
@@ -212,7 +219,6 @@
   function buildWardrobeCarouselUI() {
     if (!assetsScrollLane) return;
 
-    // Зачищаем старые карточки, оставляя только элемент добавления своего предмета
     const uploadWrapper = assetsScrollLane.querySelector(".upload-card-wrapper");
     assetsScrollLane.innerHTML = "";
     if (uploadWrapper) {
