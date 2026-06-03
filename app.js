@@ -1,4 +1,4 @@
-﻿// Оригинальный интерактивный холст WebApp конструктора v6.0
+﻿// Финальный интерактивный холст WebApp конструктора v6.0 под ИИ-конвейер
 (function () {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) {
@@ -13,7 +13,7 @@
   const doneBtn = document.getElementById("doneBtn");
   const errorText = document.getElementById("errorText");
 
-  // Извлечение UI-элементов управления каруселью гардероба v6.0
+  // UI-элементы управления каруселью гардероба и кастомной загрузки v6.0
   const prevBtn = document.getElementById("prevBtn");
   const nextBtn = document.getElementById("nextBtn");
   const wardrobeControls = document.getElementById("wardrobeControls");
@@ -22,7 +22,7 @@
   const params = new URLSearchParams(window.location.search);
   const sessionToken = params.get("token");
 
-  // Базовый адрес туннеля, синхронизированный с config.py
+  // Базовый адрес туннеля, строго синхронизированный с config.py
   const BASE_API_URL = "https://tackle-unvisited-doorbell.ngrok-free.dev";
 
   let W = 1024;
@@ -49,7 +49,7 @@
     item: null,
   };
 
-  // Глобальный пакет гардеробной сессии
+  // Пакет гардеробной сессии под массив ассетов из бэкенда
   let globalAssetsPack = [];
   let currentAssetIndex = 0;
 
@@ -65,7 +65,7 @@
       }
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("Критическая ошибка десериализации потока Base64."));
+      img.onerror = () => reject(new Error("Ошибка десериализации потока Base64."));
       img.src = base64Data;
     });
   }
@@ -88,7 +88,7 @@
     let targetW = itemW;
     let targetH = itemH;
     
-    // Отрисовка с сохранением пропорций впекания Pillow
+    // Отрисовка с сохранением пропорций под Pillow-бекинг
     if (itemW > itemH) {
       targetW = 358; 
       targetH = 358 / aspect;
@@ -171,7 +171,7 @@
     });
   }
 
-  // Динамическое переключение элементов внутри активного пакета WebApp
+  // Переключение элементов внутри активного пакета
   async function switchActiveAsset(index) {
     if (!globalAssetsPack || globalAssetsPack.length === 0) return;
     try {
@@ -180,7 +180,6 @@
       const itemImg = await loadImage(assetData.b64);
       images.item = itemImg;
 
-      // Автоматический подгон масштаба под пропорции ИИ-витрины
       const maxStartSize = W * 0.35;
       const fitScale = maxStartSize / Math.max(itemImg.width, itemImg.height);
       state.scale = clampScale(fitScale);
@@ -212,7 +211,7 @@
     });
   }
 
-  // Интеграция обработчика загрузки «Своего предмета» через WebApp API
+  // Загрузчик «Своего предмета» (v6.0 Roadmap)
   function initCustomItemUploader() {
     if (!customItemInput) return;
     customItemInput.addEventListener("change", function (e) {
@@ -236,7 +235,6 @@
           if (!response.ok) throw new Error("ИИ не смог сегментировать объект.");
           const resData = await response.json();
           
-          // Внедряем вырезанную вещь в начало карусели
           const newAsset = {
             path: resData.path,
             b64: resData.item_b64
@@ -263,7 +261,6 @@
       doneBtn.disabled = true;
       setError("Запекание слоев на ИИ-холсте...");
 
-      // Извлекаем точный путь выбранного на витрине или загруженного предмета
       const currentAssetPath = globalAssetsPack[currentAssetIndex] ? globalAssetsPack[currentAssetIndex].path : "";
 
       const payload = {
@@ -327,13 +324,12 @@
 
       const storeData = await response.json();
       
-      // ИСПРАВЛЕНИЕ РАССИНХРОНА: Вытаскиваем массив assets_pack вместо несуществующего item
+      // Синхронизация с массивом assets_pack из Python-бэкенда
       globalAssetsPack = storeData.assets_pack || [];
       if (globalAssetsPack.length === 0) {
         throw new Error("ИИ-витрина этой категории пуста. Добавьте модели через /admin.");
       }
 
-      // Асинхронно подгружаем силуэт питомца и первый предмет из карусели
       const [bgImg, itemImg] = await Promise.all([
         loadImage(storeData.bg),
         loadImage(globalAssetsPack[0].b64)
@@ -360,7 +356,7 @@
       doneBtn.disabled = false;
       setError("");
     } catch (err) {
-      setError(err.message || "Ошибка построения интерактивного холста.");
+      setError(err.message || "Ошибка построения холста.");
     }
   }
 
