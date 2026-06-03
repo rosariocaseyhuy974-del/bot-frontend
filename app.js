@@ -1,4 +1,4 @@
-﻿// Финальный интерактивный холст WebApp конструктора v6.0 под ИИ-конвейер
+﻿// Финальный интерактивный холст WebApp конструктора v6.0 под ИИ-конвейер ленты ассетов
 (function () {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) {
@@ -12,9 +12,8 @@
   const doneBtn = document.getElementById("doneBtn");
   const errorText = document.getElementById("errorText");
 
-  // Инициализация элементов карусели гардероба и кастомной загрузки v6.0
-  const prevBtn = document.getElementById("prevBtn");
-  const nextBtn = document.getElementById("nextBtn");
+  // Извлечение контейнера горизонтальной ленты миниатюр
+  const assetsScrollLane = document.getElementById("assetsScrollLane");
   const customItemInput = document.getElementById("customItemInput");
 
   const params = new URLSearchParams(window.location.search);
@@ -174,19 +173,32 @@
     });
   }
 
-  // Переключение элементов внутри активного пакета
+  // Динамическая загрузка ассета по клику из горизонтальной ленты
   async function switchActiveAsset(index) {
     if (!globalAssetsPack || globalAssetsPack.length === 0) return;
     try {
-      setError("Загрузка модели...");
+      setError("Синхронизация предмета...");
+      currentAssetIndex = index;
+      
       const assetData = globalAssetsPack[index];
       const itemImg = await loadImage(assetData.b64);
       images.item = itemImg;
+
+      // Сброс координат в центр при выборе нового предмета
+      state.x = W / 2;
+      state.y = H / 2;
+      state.angle = 0;
 
       const maxStartSize = W * 0.35;
       const fitScale = maxStartSize / Math.max(itemImg.width, itemImg.height);
       state.scale = clampScale(fitScale);
       
+      // Визуальная подсветка выбранной карточки на витрине
+      document.querySelectorAll(".asset-card").forEach((card, i) => {
+        if (i === index) card.classList.add("active");
+        else card.classList.remove("active");
+      });
+
       setError("");
       requestDraw();
     } catch (err) {
@@ -194,28 +206,34 @@
     }
   }
 
-  function initWardrobeCarousel() {
-    if (!prevBtn || !nextBtn) return;
-    
-    // Безопасное скрытие элементов управления, если доступен всего 1 ассет
-    if (globalAssetsPack.length <= 1) {
-      prevBtn.style.visibility = "hidden";
-      nextBtn.style.visibility = "hidden";
-      return;
-    } else {
-      prevBtn.style.visibility = "visible";
-      nextBtn.style.visibility = "visible";
+  // Генерация HTML-карточек предметов внутри горизонтального скролл-бара v6.0
+  function buildWardrobeCarouselUI() {
+    if (!assetsScrollLane) return;
+
+    // Зачищаем старые карточки, оставляя только элемент добавления своего предмета (первый дочерний узел)
+    const uploadWrapper = assetsScrollLane.querySelector(".upload-card-wrapper");
+    assetsScrollLane.innerHTML = "";
+    if (uploadWrapper) {
+      assetsScrollLane.appendChild(uploadWrapper);
     }
 
-    prevBtn.onclick = () => {
-      currentAssetIndex = (currentAssetIndex - 1 + globalAssetsPack.length) % globalAssetsPack.length;
-      switchActiveAsset(currentAssetIndex);
-    };
+    globalAssetsPack.forEach((asset, index) => {
+      const card = document.createElement("div");
+      card.className = "asset-card";
+      if (index === currentAssetIndex) card.classList.add("active");
 
-    nextBtn.onclick = () => {
-      currentAssetIndex = (currentAssetIndex + 1) % globalAssetsPack.length;
-      switchActiveAsset(currentAssetIndex);
-    };
+      const img = document.createElement("img");
+      img.src = asset.b64;
+      
+      card.appendChild(img);
+      
+      // Навешиваем клик на карточку
+      card.onclick = () => {
+        switchActiveAsset(index);
+      };
+
+      assetsScrollLane.appendChild(card);
+    });
   }
 
   // Загрузчик «Своего предмета» (v6.0 Roadmap)
@@ -246,10 +264,12 @@
             path: resData.path,
             b64: resData.item_b64
           };
-          globalAssetsPack.unshift(newAsset);
-          currentAssetIndex = 0;
           
-          initWardrobeCarousel();
+          // Вставляем кастомную вырезанную вещь в начало списка
+          globalAssetsPack.unshift(newAsset);
+          
+          // Перестраиваем карусель карточек и активируем добавленный предмет
+          buildWardrobeCarouselUI();
           await switchActiveAsset(0);
         } catch (err) {
           setError("Сбой ИИ-вырезки: " + err.message);
@@ -349,7 +369,7 @@
       state.scale = clampScale(fitScale);
 
       setupGestures();
-      initWardrobeCarousel();
+      buildWardrobeCarouselUI(); // Инициализация ленты
       initCustomItemUploader();
       initDoneButton();
 

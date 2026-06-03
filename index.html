@@ -11,51 +11,105 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
   <style>
-    /* Аккуратные стили для кнопок управления гардеробом v6.0 */
-    .wardrobe-panel {
+    /* Панель витрины: горизонтальная прокрутка миниатюр ассетов */
+    .wardrobe-carousel-container {
+      width: 100%;
+      max-width: 440px;
+      margin: 8px auto;
+      padding: 0 12px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .assets-scroll-lane {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 6px 4px;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Скрытие стандартного скроллбара для сохранения нативного вида WebApp */
+    .assets-scroll-lane::-webkit-scrollbar {
+      display: none;
+    }
+    .assets-scroll-lane {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Иконки-карточки предметов внутри карусели */
+    .asset-card {
+      flex: 0 0 76px;
+      height: 76px;
+      background: #1f1f1f;
+      border: 2px solid #2d2d2d;
+      border-radius: 14px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
+      cursor: pointer;
+      box-sizing: border-box;
+      transition: border-color 0.2s, background 0.2s, transform 0.1s;
+    }
+
+    .asset-card:active {
+      transform: scale(0.95);
+    }
+
+    .asset-card.active {
+      border-color: #3498db;
+      background: rgba(52, 152, 219, 0.12);
+    }
+
+    .asset-card img {
+      width: 85%;
+      height: 85%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    /* Кнопка добавления своего кастомного предмета v6.0 */
+    .upload-card-wrapper {
+      flex: 0 0 76px;
+      height: 76px;
+      position: relative;
+    }
+
+    .custom-upload-trigger {
       width: 100%;
-      max-width: 400px;
-      margin: 12px auto;
-      padding: 0 16px;
+      height: 100%;
+      background: #141414;
+      border: 2px dashed #3498db;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #3498db;
+      font-size: 22px;
+      cursor: pointer;
       box-sizing: border-box;
     }
-    .carousel-btn {
-      background: #242424;
-      color: #fff;
-      border: 1px solid #333;
-      padding: 10px 18px;
-      font-size: 18px;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .carousel-btn:active {
-      background: #444;
-    }
-    .upload-wrapper {
-      position: relative;
-      overflow: hidden;
-      display: inline-block;
-    }
-    .upload-trigger {
-      border: 1px dashed #3498db;
-      color: #3498db;
-      background: rgba(52, 152, 219, 0.08);
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 13px;
-      font-weight: 700;
+
+    .custom-upload-trigger span {
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      margin-top: 2px;
       font-family: 'Manrope', sans-serif;
-      cursor: pointer;
     }
-    .upload-wrapper input[type=file] {
-      font-size: 100px;
+
+    .upload-card-wrapper input[type=file] {
       position: absolute;
       left: 0;
       top: 0;
+      width: 100%;
+      height: 100%;
       opacity: 0;
       cursor: pointer;
     }
@@ -75,13 +129,15 @@
       <div class="hint">Перемещайте, масштабируйте (pinch), вращайте объект</div>
     </div>
 
-    <div class="wardrobe-panel">
-      <button id="prevBtn" class="carousel-btn" type="button">⬅️</button>
-      <div class="upload-wrapper">
-        <button class="upload-trigger" type="button">👑 Свой предмет (+2 ⭐️)</button>
-        <input type="file" id="customItemInput" accept="image/*">
-      </div>
-      <button id="nextBtn" class="carousel-btn" type="button">➡️</button>
+    <div class="wardrobe-carousel-container">
+      <div class="assets-scroll-lane" id="assetsScrollLane">
+        <div class="upload-card-wrapper">
+          <div class="custom-upload-trigger">
+            ➕<span>Свой (+2⭐️)</span>
+          </div>
+          <input type="file" id="customItemInput" accept="image/*">
+        </div>
+        </div>
     </div>
 
     <div class="error" id="errorText"></div>
@@ -91,6 +147,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=6.1"></script>
+  <script src="app.js?v=6.2"></script>
 </body>
 </html>
