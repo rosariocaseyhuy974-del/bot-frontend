@@ -1,4 +1,4 @@
-﻿// Финальный интерактивный холст WebApp конструктора v6.4 с абсолютной изоляцией осей жестов
+﻿// Финальный интерактивный холст WebApp конструктора v6.5 с абсолютной изоляцией осей жестов
 (function () {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) {
@@ -167,26 +167,31 @@
     });
 
     manager.on("pinchmove", (e) => {
-      // Изменение масштаба высчитывается как чистый коэффициент без влияния на оси X/Y
       state.scale = clampScale(gestureStart.scale * e.scale);
       requestDraw();
     });
 
     // --- ЛОГИКА ВРАЩЕНИЯ С ДЕМПФИРОВАНИЕМ СТАРТОВОГО СДВИГА ---
-    let initialRotationOffset = 0;
+    let initialRotationOffset = null;
 
     manager.on("rotatestart", (e) => {
       gestureStart.angle = state.angle;
-      // 🛡 СУПЕР-ФИКС: Запоминаем изначальный системный угол Hammer в момент касания стекла
+      // В момент первого касания фиксируем стартовый угол Hammer как базовую точку отсчета
       initialRotationOffset = e.rotation;
     });
 
     manager.on("rotatemove", (e) => {
-      // 🛡 СУПЕР-ФИКС: Вычитаем стартовый сдвиг из текущего вращения. 
-      // Картинка начнет вращаться плавно именно с того угла, на котором она находилась, без скачков!
+      if (initialRotationOffset === null) return;
+      
+      // 🛡 СУПЕР-ФИКС: Вычисляем чистую разницу поворота с момента касания стекла.
+      // Это полностью предотвращает рывки и произвольные довороты ассета на 90 градусов.
       const cleanDeltaRotation = e.rotation - initialRotationOffset;
       state.angle = (gestureStart.angle + cleanDeltaRotation) % 360;
       requestDraw();
+    });
+
+    manager.on("rotateend", () => {
+      initialRotationOffset = null;
     });
   }
 
@@ -201,7 +206,8 @@
       const itemImg = await loadImage(assetData.b64);
       images.item = itemImg;
 
-      // UX-улучшение: Координаты и угол сохраняются для бесшовной примерки разных моделей
+      // 🛡 СУПЕР-ФИКС: Мы больше не зануляем угол и координаты при клике по карусели!
+      // Вещь встанет ровно на то место и под тем углом, который настроил пользователь для предыдущего предмета.
       
       document.querySelectorAll(".asset-card").forEach((card, i) => {
         if (i === index) card.classList.add("active");
@@ -364,7 +370,7 @@
       images.bg = bgImg;
       images.item = itemImg;
 
-      // Первичная центровка
+      // Первичная центровка только при первом запуске WebApp
       state.x = W / 2;
       state.y = H / 2;
       state.angle = 0;
