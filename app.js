@@ -88,7 +88,7 @@
     let targetW = itemW;
     let targetH = itemH;
     
-    // Отрисовка с сохранением пропорций под Pillow-бекинг
+    // Отрисовка с сохранением пропорций под Pillow-бекинг [cite: 272]
     if (itemW > itemH) {
       targetW = 358; 
       targetH = 358 / aspect;
@@ -211,14 +211,14 @@
     });
   }
 
-  // Загрузчик «Своего предмета» (v6.0 Roadmap)
+  // Загрузчик «Своего предмета» (v6.0 Roadmap) [cite: 326, 350]
   function initCustomItemUploader() {
     if (!customItemInput) return;
     customItemInput.addEventListener("change", function (e) {
       const file = e.target.files[0];
       if (!file) return;
 
-      setError("ИИ очищает фон ассета на CPU...");
+      setError("ИИ очищает фон ассета на CPU..."); [cite: 267]
       const reader = new FileReader();
       reader.onload = async function (evt) {
         const base64Raw = evt.target.result;
@@ -259,7 +259,7 @@
   function initDoneButton() {
     doneBtn.addEventListener("click", async () => {
       doneBtn.disabled = true;
-      setError("Запекание слоев на ИИ-холсте...");
+      setError("Запекание слоев на ИИ-холсте..."); [cite: 284]
 
       const currentAssetPath = globalAssetsPack[currentAssetIndex] ? globalAssetsPack[currentAssetIndex].path : "";
 
@@ -312,7 +312,7 @@
       const response = await fetch(`${BASE_API_URL}/get_state`, {
         method: "POST",
         headers: {
-          "application/json": "application/json",
+          "Content-Type": "application/json", // 🛡 СУПЕР-ФИКС: Исправлено невалидное имя HTTP-заголовка!
           "ngrok-skip-browser-warning": "true"
         },
         body: JSON.stringify({ token: sessionToken })
@@ -324,7 +324,7 @@
 
       const storeData = await response.json();
       
-      // Синхронизация с массивом assets_pack из Python-бэкенда
+      // Синхронизация с массивом assets_pack из Python-бэкенда [cite: 283]
       globalAssetsPack = storeData.assets_pack || [];
       if (globalAssetsPack.length === 0) {
         throw new Error("ИИ-витрина этой категории пуста. Добавьте модели через /admin.");
