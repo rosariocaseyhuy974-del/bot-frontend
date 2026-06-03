@@ -7,16 +7,14 @@
   }
 
   const canvas = document.getElementById("editorCanvas");
-  const canvasWrap = document.getElementById("canvasWrap");
   const ctx = canvas.getContext("2d");
   const gestureLayer = document.getElementById("gestureLayer");
   const doneBtn = document.getElementById("doneBtn");
   const errorText = document.getElementById("errorText");
 
-  // UI-элементы управления каруселью гардероба и кастомной загрузки v6.0
+  // Инициализация элементов карусели гардероба и кастомной загрузки v6.0
   const prevBtn = document.getElementById("prevBtn");
   const nextBtn = document.getElementById("nextBtn");
-  const wardrobeControls = document.getElementById("wardrobeControls");
   const customItemInput = document.getElementById("customItemInput");
 
   const params = new URLSearchParams(window.location.search);
@@ -88,7 +86,7 @@
     let targetW = itemW;
     let targetH = itemH;
     
-    // Отрисовка с сохранением пропорций под Pillow-бекинг [cite: 272]
+    // Отрисовка с сохранением пропорций под Pillow-бекинг
     if (itemW > itemH) {
       targetW = 358; 
       targetH = 358 / aspect;
@@ -121,6 +119,11 @@
   }
 
   function setupGestures() {
+    if (!window.Hammer) {
+      setError("Hammer.js не инициализирован.");
+      return;
+    }
+
     const manager = new Hammer.Manager(gestureLayer, {
       touchAction: 'none'
     });
@@ -194,31 +197,35 @@
   function initWardrobeCarousel() {
     if (!prevBtn || !nextBtn) return;
     
+    // Безопасное скрытие элементов управления, если доступен всего 1 ассет
     if (globalAssetsPack.length <= 1) {
-      if (prevBtn.style) prevBtn.style.display = "none";
-      if (nextBtn.style) nextBtn.style.display = "none";
+      prevBtn.style.visibility = "hidden";
+      nextBtn.style.visibility = "hidden";
       return;
+    } else {
+      prevBtn.style.visibility = "visible";
+      nextBtn.style.visibility = "visible";
     }
 
-    prevBtn.addEventListener("click", () => {
+    prevBtn.onclick = () => {
       currentAssetIndex = (currentAssetIndex - 1 + globalAssetsPack.length) % globalAssetsPack.length;
       switchActiveAsset(currentAssetIndex);
-    });
+    };
 
-    nextBtn.addEventListener("click", () => {
+    nextBtn.onclick = () => {
       currentAssetIndex = (currentAssetIndex + 1) % globalAssetsPack.length;
       switchActiveAsset(currentAssetIndex);
-    });
+    };
   }
 
-  // Загрузчик «Своего предмета» (v6.0 Roadmap) [cite: 326, 350]
+  // Загрузчик «Своего предмета» (v6.0 Roadmap)
   function initCustomItemUploader() {
     if (!customItemInput) return;
-    customItemInput.addEventListener("change", function (e) {
+    customItemInput.onchange = function (e) {
       const file = e.target.files[0];
       if (!file) return;
 
-      setError("ИИ очищает фон ассета на CPU..."); [cite: 267]
+      setError("ИИ очищает фон ассета на CPU...");
       const reader = new FileReader();
       reader.onload = async function (evt) {
         const base64Raw = evt.target.result;
@@ -242,24 +249,20 @@
           globalAssetsPack.unshift(newAsset);
           currentAssetIndex = 0;
           
-          if (prevBtn && nextBtn && globalAssetsPack.length > 1) {
-            prevBtn.style.display = "inline-block";
-            nextBtn.style.display = "inline-block";
-          }
-          
+          initWardrobeCarousel();
           await switchActiveAsset(0);
         } catch (err) {
           setError("Сбой ИИ-вырезки: " + err.message);
         }
       };
       reader.readAsDataURL(file);
-    });
+    };
   }
 
   function initDoneButton() {
-    doneBtn.addEventListener("click", async () => {
+    doneBtn.onclick = async () => {
       doneBtn.disabled = true;
-      setError("Запекание слоев на ИИ-холсте..."); [cite: 284]
+      setError("Запекание слоев на ИИ-холсте...");
 
       const currentAssetPath = globalAssetsPack[currentAssetIndex] ? globalAssetsPack[currentAssetIndex].path : "";
 
@@ -297,7 +300,7 @@
         doneBtn.disabled = false;
         setError("Ошибка передачи: " + err.message);
       }
-    });
+    };
   }
 
   async function init() {
@@ -312,7 +315,7 @@
       const response = await fetch(`${BASE_API_URL}/get_state`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json", // 🛡 СУПЕР-ФИКС: Исправлено невалидное имя HTTP-заголовка!
+          "Content-Type": "application/json",
           "ngrok-skip-browser-warning": "true"
         },
         body: JSON.stringify({ token: sessionToken })
@@ -324,7 +327,6 @@
 
       const storeData = await response.json();
       
-      // Синхронизация с массивом assets_pack из Python-бэкенда [cite: 283]
       globalAssetsPack = storeData.assets_pack || [];
       if (globalAssetsPack.length === 0) {
         throw new Error("ИИ-витрина этой категории пуста. Добавьте модели через /admin.");
@@ -345,9 +347,7 @@
       const maxStartSize = W * 0.35;
       const fitScale = maxStartSize / Math.max(itemImg.width, itemImg.height);
       state.scale = clampScale(fitScale);
-      constrainPosition();
 
-      draw();
       setupGestures();
       initWardrobeCarousel();
       initCustomItemUploader();
@@ -355,6 +355,7 @@
 
       doneBtn.disabled = false;
       setError("");
+      requestDraw();
     } catch (err) {
       setError(err.message || "Ошибка построения холста.");
     }

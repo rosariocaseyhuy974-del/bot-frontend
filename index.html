@@ -10,6 +10,56 @@
   <link rel="stylesheet" href="styles.css" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <style>
+    /* Аккуратные стили для кнопок управления гардеробом v6.0 */
+    .wardrobe-panel {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 400px;
+      margin: 12px auto;
+      padding: 0 16px;
+      box-sizing: border-box;
+    }
+    .carousel-btn {
+      background: #242424;
+      color: #fff;
+      border: 1px solid #333;
+      padding: 10px 18px;
+      font-size: 18px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .carousel-btn:active {
+      background: #444;
+    }
+    .upload-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+    }
+    .upload-trigger {
+      border: 1px dashed #3498db;
+      color: #3498db;
+      background: rgba(52, 152, 219, 0.08);
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'Manrope', sans-serif;
+      cursor: pointer;
+    }
+    .upload-wrapper input[type=file] {
+      font-size: 100px;
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
   <div class="app">
@@ -23,6 +73,15 @@
         <div id="gestureLayer"></div>
       </div>
       <div class="hint">Перемещайте, масштабируйте (pinch), вращайте объект</div>
+    </div>
+
+    <div class="wardrobe-panel">
+      <button id="prevBtn" class="carousel-btn" type="button">⬅️</button>
+      <div class="upload-wrapper">
+        <button class="upload-trigger" type="button">👑 Свой предмет (+2 ⭐️)</button>
+        <input type="file" id="customItemInput" accept="image/*">
+      </div>
+      <button id="nextBtn" class="carousel-btn" type="button">➡️</button>
     </div>
 
     <div class="error" id="errorText"></div>
