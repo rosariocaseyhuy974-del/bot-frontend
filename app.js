@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) {
     tg.ready();
@@ -24,10 +24,10 @@
       brand_title: "Collage Editor",
       brand_badge: "Telegram WebApp",
       hint: "Перемещайте, масштабируйте (pinch), вращайте объект",
-      upload_label: "Свой (+2\u2B50)",
+      upload_label: "Свой (+2⭐)",
       done: "Готово",
       sheet_title: "Настройка анимации",
-      confirm_render: "\uD83D\uDD25 Запустить ИИ-генерацию",
+      confirm_render: "🔥 Запустить ИИ-генерацию",
       loading_session: "Синхронизация сессии...",
       loading_item: "Синхронизация предмета...",
       loading_upload: "ИИ очищает фон ассета...",
@@ -45,10 +45,10 @@
       brand_title: "Collage Editor",
       brand_badge: "Telegram WebApp",
       hint: "Move, scale (pinch), rotate the object",
-      upload_label: "Custom (+2\u2B50)",
+      upload_label: "Custom (+2⭐)",
       done: "Done",
       sheet_title: "Animation Settings",
-      confirm_render: "\uD83D\uDD25 Start AI Generation",
+      confirm_render: "🔥 Start AI Generation",
       loading_session: "Syncing session...",
       loading_item: "Syncing item...",
       loading_upload: "AI removing background...",
@@ -98,6 +98,7 @@
       var next = currentLang === "ru" ? "en" : "ru";
       setLanguage(next);
       generateTracks();
+      hapticImpact("light");
     });
   }
 
@@ -110,18 +111,28 @@
   canvas.width = W;
   canvas.height = H;
 
+  // LERP Target States
+  const targetState = {
+    x: W / 2,
+    y: H / 2,
+    scale: 1.0,
+    angle: 0
+  };
+
+  // Currently rendered state (interpolates towards targetState)
   const state = {
     x: W / 2,
     y: H / 2,
     scale: 1.0,
-    angle: 0,
+    angle: 0
   };
 
+  // State when gesture started
   const gestureStart = {
-    x: state.x,
-    y: state.y,
-    scale: state.scale,
-    angle: state.angle,
+    x: W / 2,
+    y: H / 2,
+    scale: 1.0,
+    angle: 0
   };
 
   const images = {
@@ -139,10 +150,6 @@
     { x: W * 0.5, y: H * 0.65, label: "eyes" },
   ];
 
-  let snapAnimId = null;
-  let rafId = 0;
-  let scrollRafId = null;
-  let orientationRafId = null;
   let isSheetOpen = false;
 
   function setError(msg) {
@@ -174,10 +181,9 @@
     return Math.min(8, Math.max(0.05, v));
   }
 
-  function constrainPosition() {
-    if (!images.item) return;
-    state.x = Math.min(W, Math.max(0, state.x));
-    state.y = Math.min(H, Math.max(0, state.y));
+  function constrainPosition(pos) {
+    pos.x = Math.min(W, Math.max(0, pos.x));
+    pos.y = Math.min(H, Math.max(0, pos.y));
   }
 
   function draw() {
@@ -207,102 +213,114 @@
     ctx.restore();
   }
 
-  function requestDraw() {
-    if (rafId) return;
-    rafId = requestAnimationFrame(function () {
-      rafId = 0;
-      draw();
-    });
-  }
-
-  function snapToZone(targetX, targetY) {
-    if (snapAnimId) cancelAnimationFrame(snapAnimId);
-    function step() {
-      var dx = targetX - state.x;
-      var dy = targetY - state.y;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 0.5) {
-        state.x = targetX;
-        state.y = targetY;
-        snapAnimId = null;
-        requestDraw();
-        return;
-      }
-      state.x += dx * 0.7;
-      state.y += dy * 0.7;
-      constrainPosition();
-      requestDraw();
-      snapAnimId = requestAnimationFrame(step);
-    }
-    snapAnimId = requestAnimationFrame(step);
-  }
-
+  // Smart Snap Magnet logic with LERP
   function checkSmartZones() {
-    if (!images.item) return;
+    if (!images.item) return false;
     for (var i = 0; i < smartZones.length; i++) {
       var zone = smartZones[i];
-      var dx = state.x - zone.x;
-      var dy = state.y - zone.y;
+      var dx = targetState.x - zone.x;
+      var dy = targetState.y - zone.y;
       var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 35) {
-        snapToZone(zone.x, zone.y);
-        hapticImpact("light");
-        return;
+      if (dist < 40) {
+        targetState.x = zone.x;
+        targetState.y = zone.y;
+        return i; // Returns snapped zone index
       }
     }
+    return -1;
   }
 
   function setupTouchEvents() {
     gestureLayer.style.touchAction = "none";
 
-    var tState = {
+    const tState = {
       startX: 0, startY: 0,
       startDist: 0, startAngle: 0,
-      pointerCount: 0
+      pointerCount: 0,
+      isSnapped: false,
+      snappedZoneIndex: -1
     };
 
     gestureLayer.addEventListener('touchstart', function (e) {
       e.preventDefault();
-      if (snapAnimId) {
-        cancelAnimationFrame(snapAnimId);
-        snapAnimId = null;
-      }
       var touches = e.touches;
+      
+      // Sycn targetState to state on start to avoid jumping if lerp was running
+      targetState.x = state.x;
+      targetState.y = state.y;
+      targetState.scale = state.scale;
+      targetState.angle = state.angle;
+      
       if (touches.length === 1) {
         tState.startX = touches[0].clientX;
         tState.startY = touches[0].clientY;
-        gestureStart.x = state.x;
-        gestureStart.y = state.y;
+        gestureStart.x = targetState.x;
+        gestureStart.y = targetState.y;
+        tState.isSnapped = false;
+        tState.snappedZoneIndex = -1;
       } else if (touches.length === 2) {
         var dx = touches[0].clientX - touches[1].clientX;
         var dy = touches[0].clientY - touches[1].clientY;
         tState.startDist = Math.sqrt(dx * dx + dy * dy);
         tState.startAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-        gestureStart.scale = state.scale;
-        gestureStart.angle = state.angle;
+        gestureStart.scale = targetState.scale;
+        gestureStart.angle = targetState.angle;
       }
       tState.pointerCount = touches.length;
+      hapticImpact("light");
     }, { passive: false });
 
     gestureLayer.addEventListener('touchmove', function (e) {
       e.preventDefault();
       var touches = e.touches;
+      var rect = canvas.getBoundingClientRect();
+      var scaleX = W / rect.width;
+      var scaleY = H / rect.height;
 
       if (touches.length === 1) {
         if (tState.pointerCount > 1) {
           tState.startX = touches[0].clientX;
           tState.startY = touches[0].clientY;
-          gestureStart.x = state.x;
-          gestureStart.y = state.y;
+          gestureStart.x = targetState.x;
+          gestureStart.y = targetState.y;
+          tState.isSnapped = false;
         }
-        var rect = canvas.getBoundingClientRect();
-        var scaleX = W / rect.width;
-        var scaleY = H / rect.height;
-        state.x = gestureStart.x + (touches[0].clientX - tState.startX) * scaleX;
-        state.y = gestureStart.y + (touches[0].clientY - tState.startY) * scaleY;
-        constrainPosition();
-        checkSmartZones();
-        requestDraw();
+
+        const deltaFingerX = (touches[0].clientX - tState.startX) * scaleX;
+        const deltaFingerY = (touches[0].clientY - tState.startY) * scaleY;
+        const wantedX = gestureStart.x + deltaFingerX;
+        const wantedY = gestureStart.y + deltaFingerY;
+
+        if (tState.isSnapped) {
+          // Calculate distance between current finger position and snapped zone
+          const zone = smartZones[tState.snappedZoneIndex];
+          const distToZone = Math.sqrt(Math.pow(wantedX - zone.x, 2) + Math.pow(wantedY - zone.y, 2));
+          
+          if (distToZone > 65) {
+            // Unsnap!
+            tState.isSnapped = false;
+            tState.snappedZoneIndex = -1;
+            tState.startX = touches[0].clientX;
+            tState.startY = touches[0].clientY;
+            gestureStart.x = state.x;
+            gestureStart.y = state.y;
+            targetState.x = state.x;
+            targetState.y = state.y;
+            hapticImpact("light");
+          }
+        } else {
+          targetState.x = wantedX;
+          targetState.y = wantedY;
+          constrainPosition(targetState);
+          
+          // Check if we hit a smart zone
+          const zoneIdx = checkSmartZones();
+          if (zoneIdx !== -1) {
+            tState.isSnapped = true;
+            tState.snappedZoneIndex = zoneIdx;
+            hapticImpact("medium");
+          }
+        }
       } else if (touches.length === 2) {
         var dx = touches[0].clientX - touches[1].clientX;
         var dy = touches[0].clientY - touches[1].clientY;
@@ -312,14 +330,14 @@
         if (tState.pointerCount < 2) {
           tState.startDist = dist;
           tState.startAngle = angle;
-          gestureStart.scale = state.scale;
-          gestureStart.angle = state.angle;
+          gestureStart.scale = targetState.scale;
+          gestureStart.angle = targetState.angle;
         }
+        
         if (tState.startDist > 0) {
-          state.scale = clampScale(gestureStart.scale * (dist / tState.startDist));
+          targetState.scale = clampScale(gestureStart.scale * (dist / tState.startDist));
         }
-        state.angle = (gestureStart.angle + angle - tState.startAngle) % 360;
-        requestDraw();
+        targetState.angle = (gestureStart.angle + angle - tState.startAngle) % 360;
       }
       tState.pointerCount = touches.length;
     }, { passive: false });
@@ -330,10 +348,13 @@
         if (touches.length === 1) {
           tState.startX = touches[0].clientX;
           tState.startY = touches[0].clientY;
-          gestureStart.x = state.x;
-          gestureStart.y = state.y;
+          gestureStart.x = targetState.x;
+          gestureStart.y = targetState.y;
+          tState.isSnapped = false;
         }
         tState.pointerCount = touches.length;
+      } else {
+        tState.pointerCount = 0;
       }
     });
   }
@@ -353,7 +374,6 @@
       });
 
       setError("");
-      requestDraw();
     } catch (err) {
       setError(__("error_switch") + err.message);
     }
@@ -421,6 +441,7 @@
           globalAssetsPack.unshift(newAsset);
           buildWardrobeCarouselUI();
           await switchActiveAsset(0);
+          hapticImpact("medium");
         } catch (err) {
           setError(__("error_upload") + err.message);
         }
@@ -449,27 +470,28 @@
 
     cards.forEach(function (card) {
       card.style.transform = "scale(0.9)";
-      card.style.opacity = "0.6";
+      card.style.opacity = "0.5";
       card.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
       card.style.borderColor = "";
     });
 
     if (closestCard) {
-      closestCard.style.transform = "scale(1.15)";
+      closestCard.style.transform = "scale(1.1)";
       closestCard.style.opacity = "1";
-      closestCard.style.boxShadow = "0 0 15px rgba(14,165,233,0.6)";
+      closestCard.style.boxShadow = "0 0 20px var(--accent-glow)";
       closestCard.style.borderColor = "#0ea5e9";
     }
   }
 
   if (assetsScrollLane) {
+    let scrollTimeout = null;
     assetsScrollLane.addEventListener("scroll", function () {
-      if (scrollRafId) return;
-      scrollRafId = requestAnimationFrame(function () {
-        scrollRafId = null;
-        updateCarouselFocus();
+      updateCarouselFocus();
+      
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(function () {
         hapticImpact("light");
-      });
+      }, 80);
     });
   }
 
@@ -477,10 +499,10 @@
     if (isSheetOpen) return;
     isSheetOpen = true;
     bottomSheet.classList.add("open");
-    hapticImpact("light");
+    hapticImpact("medium");
     if (invoiceBlock) {
       var price = currentLang === "en" ? 20 : accumulatedActions;
-      invoiceBlock.textContent = (currentLang === "en" ? "25 Actions / " : "") + price + " \u2B50";
+      invoiceBlock.textContent = (currentLang === "en" ? "25 Actions / " : "") + price + " ⭐️";
     }
     generateTracks();
   }
@@ -489,14 +511,15 @@
     if (!isSheetOpen) return;
     isSheetOpen = false;
     bottomSheet.classList.remove("open");
+    hapticImpact("light");
   }
 
   function generateTracks() {
     if (!tracksLane) return;
     var categories = ["liveportrait", "sadtalker"];
     var trackLabels = {
-      ru: ["\uD83C\uDFAC Track #1", "\uD83C\uDFAC Track #2"],
-      en: ["\uD83C\uDFAC Track #1", "\uD83C\uDFAC Track #2"]
+      ru: ["🎬 Track #1", "🎬 Track #2"],
+      en: ["🎬 Track #1", "🎬 Track #2"]
     };
     tracksLane.innerHTML = "";
     var labels = trackLabels[currentLang] || trackLabels.ru;
@@ -533,8 +556,10 @@
     });
 
     confirmRenderBtn.addEventListener('touchstart', async function (e) {
+      e.preventDefault();
       confirmRenderBtn.disabled = true;
       confirmRenderBtn.classList.add("loading");
+      hapticImpact("medium");
 
       setError(__("loading_render"));
 
@@ -567,7 +592,7 @@
         if (response.ok) {
           setError("");
           closeBottomSheet();
-          hapticImpact("light");
+          hapticImpact("heavy");
           if (tg && typeof tg.close === "function") {
             setTimeout(function () { tg.close(); }, 400);
           }
@@ -584,28 +609,62 @@
     });
   }
 
+  // Gyroscope Parallax variables
+  const targetTilt = { x: 0, y: 0 };
+  const currentTilt = { x: 0, y: 0 };
+
   function initOrientationParallax() {
     if (!window.DeviceOrientationEvent) return;
     window.addEventListener(
       "deviceorientation",
       function (e) {
-        if (orientationRafId) return;
-        orientationRafId = requestAnimationFrame(function () {
-          orientationRafId = null;
-          var gamma = e.gamma || 0;
-          var beta = e.beta || 0;
-          var clampedGamma = Math.max(-30, Math.min(30, gamma));
-          var clampedBeta = Math.max(-30, Math.min(30, beta));
-          var translateX = (clampedGamma / 30) * 15;
-          var translateY = (clampedBeta / 30) * 15;
-          var spline = document.querySelector("spline-viewer");
-          if (spline) {
-            spline.style.transform = "translate(" + translateX + "px, " + translateY + "px)";
-          }
-        });
+        var gamma = e.gamma || 0; // Left-to-right tilt
+        var beta = e.beta || 0;   // Front-to-back tilt
+        
+        // Clamp orientation angles to avoid excessive scaling
+        var clampedGamma = Math.max(-25, Math.min(25, gamma));
+        var clampedBeta = Math.max(-25, Math.min(25, beta));
+        
+        targetTilt.x = (clampedGamma / 25) * 16; // translation in pixels
+        targetTilt.y = (clampedBeta / 25) * 16;
       },
       { passive: true }
     );
+  }
+
+  // Continuous LERP render tick loop (60 FPS)
+  function tick() {
+    // ⚡ LERP (Linear Interpolation) factors
+    const LERP_FACTOR = 0.22;
+    const TILT_LERP = 0.08;
+
+    // 1. Interpolate accessory position
+    state.x += (targetState.x - state.x) * LERP_FACTOR;
+    state.y += (targetState.y - state.y) * LERP_FACTOR;
+    state.scale += (targetState.scale - state.scale) * LERP_FACTOR;
+    
+    // 2. Shortest-path angle interpolation
+    let diffAngle = targetState.angle - state.angle;
+    diffAngle = ((diffAngle + 180) % 360) - 180;
+    if (diffAngle < -180) diffAngle += 360;
+    state.angle += diffAngle * LERP_FACTOR;
+
+    // 3. Interpolate Spline 3D Tilt
+    currentTilt.x += (targetTilt.x - currentTilt.x) * TILT_LERP;
+    currentTilt.y += (targetTilt.y - currentTilt.y) * TILT_LERP;
+
+    // Apply CSS 3D matrix Tilt to Spline-viewer container
+    const spline = document.getElementById("splineBg");
+    if (spline) {
+      const rotY = (currentTilt.x / 16) * 5;  // Rotate Y based on horizontal tilt
+      const rotX = -(currentTilt.y / 16) * 5; // Rotate X based on vertical tilt
+      spline.style.transform = `perspective(1000px) translate3d(${currentTilt.x}px, ${currentTilt.y}px, 0) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+    }
+
+    // Redraw Canvas Frame
+    draw();
+
+    requestAnimationFrame(tick);
   }
 
   async function init() {
@@ -645,13 +704,19 @@
       images.bg = bgImg;
       images.item = itemImg;
 
-      state.x = W / 2;
-      state.y = H / 2;
-      state.angle = 0;
+      targetState.x = W / 2;
+      targetState.y = H / 2;
+      targetState.angle = 0;
 
       var maxStartSize = W * 0.35;
       var fitScale = maxStartSize / Math.max(itemImg.width, itemImg.height);
-      state.scale = clampScale(fitScale);
+      targetState.scale = clampScale(fitScale);
+
+      // Instantly sync initial state to avoid slider effect on first load
+      state.x = targetState.x;
+      state.y = targetState.y;
+      state.angle = targetState.angle;
+      state.scale = targetState.scale;
 
       setupTouchEvents();
       buildWardrobeCarouselUI();
@@ -659,9 +724,11 @@
       initBottomSheet();
       initOrientationParallax();
 
+      // Launch continuous 60FPS tick rendering
+      requestAnimationFrame(tick);
+
       doneBtn.disabled = false;
       setError("");
-      requestDraw();
     } catch (err) {
       setError(err.message || "Canvas build error.");
     }
