@@ -3,150 +3,60 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Telegram WebApp Editor</title>
+  <title>Collage Editor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
-  <style>
-    /* Панель витрины: горизонтальная прокрутка миниатюр ассетов */
-    .wardrobe-carousel-container {
-      width: 100%;
-      max-width: 440px;
-      margin: 8px auto;
-      padding: 0 12px;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .assets-scroll-lane {
-      display: flex;
-      gap: 12px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      padding: 6px 4px;
-      scroll-behavior: smooth;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    /* Скрытие стандартного скроллбара для сохранения нативного вида WebApp */
-    .assets-scroll-lane::-webkit-scrollbar {
-      display: none;
-    }
-    .assets-scroll-lane {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-
-    /* Иконки-карточки предметов внутри карусели */
-    .asset-card {
-      flex: 0 0 76px;
-      height: 76px;
-      background: #1f1f1f;
-      border: 2px solid #2d2d2d;
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-sizing: border-box;
-      transition: border-color 0.2s, background 0.2s, transform 0.1s;
-    }
-
-    .asset-card:active {
-      transform: scale(0.95);
-    }
-
-    .asset-card.active {
-      border-color: #3498db;
-      background: rgba(52, 152, 219, 0.12);
-    }
-
-    .asset-card img {
-      width: 85%;
-      height: 85%;
-      object-fit: contain;
-      pointer-events: none;
-    }
-
-    /* Кнопка добавления своего кастомного предмета v6.0 */
-    .upload-card-wrapper {
-      flex: 0 0 76px;
-      height: 76px;
-      position: relative;
-    }
-
-    .custom-upload-trigger {
-      width: 100%;
-      height: 100%;
-      background: #141414;
-      border: 2px dashed #3498db;
-      border-radius: 14px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: #3498db;
-      font-size: 22px;
-      cursor: pointer;
-      box-sizing: border-box;
-    }
-
-    .custom-upload-trigger span {
-      font-size: 9px;
-      font-weight: 800;
-      text-transform: uppercase;
-      margin-top: 2px;
-      font-family: 'Manrope', sans-serif;
-    }
-
-    .upload-card-wrapper input[type=file] {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0;
-      cursor: pointer;
-    }
-  </style>
+  <script type="module" src="https://unpkg.com/@splinetool/viewer@latest/build/spline-viewer.js"></script>
 </head>
 <body>
+  <spline-viewer id="splineBg" url="https://prod.spline.design/kZDDjO5HvS9w3g78/scene.splinecode" loading-anim></spline-viewer>
+
   <div class="app">
     <div class="brand">
-      <span>Collage Editor</span>
-      <span class="brand-badge">Telegram WebApp</span>
+      <div id="langSwitch" class="lang-btn">RU</div>
+      <div class="brand-info">
+        <span data-i18n="brand_title">Collage Editor</span>
+        <span class="brand-badge" data-i18n="brand_badge">Telegram WebApp</span>
+      </div>
     </div>
+
     <div class="stage">
       <div class="canvas-wrap" id="canvasWrap">
         <canvas id="editorCanvas" width="1024" height="1024"></canvas>
         <div id="gestureLayer"></div>
       </div>
-      <div class="hint">Перемещайте, масштабируйте (pinch), вращайте объект</div>
+      <div class="hint" data-i18n="hint">Перемещайте, масштабируйте (pinch), вращайте объект</div>
     </div>
 
     <div class="wardrobe-carousel-container">
       <div class="assets-scroll-lane" id="assetsScrollLane">
         <div class="upload-card-wrapper">
           <div class="custom-upload-trigger">
-            ➕<span>Свой (+2⭐️)</span>
+            ➕<span data-i18n="upload_label">Свой (+2⭐️)</span>
           </div>
           <input type="file" id="customItemInput" accept="image/*">
         </div>
-        </div>
+      </div>
     </div>
 
     <div class="error" id="errorText"></div>
 
     <div class="controls">
-      <button id="doneBtn" type="button" disabled>Готово</button>
+      <button id="doneBtn" type="button" disabled data-i18n="done">Готово</button>
+    </div>
+
+    <div id="bottomSheet" class="bottom-sheet">
+      <div class="sheet-bar"></div>
+      <h3 id="sheetTitle" data-i18n="sheet_title">Настройка анимации</h3>
+      <div class="tracks-lane" id="tracksLane"></div>
+      <div id="invoiceBlock" class="invoice"></div>
+      <button id="confirmRenderBtn" data-i18n="confirm_render">Запустить ИИ-генерацию</button>
     </div>
   </div>
 
-  <script src="app.js?v=6.2"></script>
+  <script src="app.js?v=7.0"></script>
 </body>
 </html>
