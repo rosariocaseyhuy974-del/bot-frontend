@@ -647,11 +647,9 @@
 
   // Pet photo uploader overlay logic
   function initPetPhotoUploader() {
-    if (!petUploadBtn || !petPhotoInput) return;
+    if (!petPhotoInput) return;
 
-    petUploadBtn.addEventListener('touchstart', function (e) {
-      e.preventDefault();
-      petPhotoInput.click();
+    petPhotoInput.addEventListener('click', function () {
       hapticImpact("light");
     });
 

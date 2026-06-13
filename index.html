@@ -19,8 +19,10 @@
       <div class="pet-upload-icon">🐶🐱</div>
       <h2 data-i18n="upload_pet_title">Загрузите фото питомца</h2>
       <p data-i18n="upload_pet_desc">Выберите качественную фотографию питомца, смотрящего вперед</p>
-      <button id="petUploadBtn" class="pet-upload-btn" type="button" data-i18n="choose_file">Выбрать файл</button>
-      <input type="file" id="petPhotoInput" accept="image/*" style="display: none;">
+      <div class="pet-upload-btn-wrapper" style="position: relative; width: 100%; height: 54px;">
+        <button class="pet-upload-btn" type="button" data-i18n="choose_file">Выбрать файл</button>
+        <input type="file" id="petPhotoInput" accept="image/*" style="position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 10;">
+      </div>
     </div>
   </div>
 
