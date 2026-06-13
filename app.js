@@ -19,6 +19,11 @@
   const tracksLane = document.getElementById("tracksLane");
   const sheetTitle = document.getElementById("sheetTitle");
 
+  // Pet upload DOM elements
+  const petUploadOverlay = document.getElementById("petUploadOverlay");
+  const petUploadBtn = document.getElementById("petUploadBtn");
+  const petPhotoInput = document.getElementById("petPhotoInput");
+
   const i18n = {
     ru: {
       brand_title: "Collage Editor",
@@ -32,6 +37,7 @@
       loading_item: "Синхронизация предмета...",
       loading_upload: "ИИ очищает фон ассета...",
       loading_render: "Запекание слоев на ИИ-холсте...",
+      loading_pet: "ИИ кадрирует фото питомца...",
       error_switch: "Ошибка переключения: ",
       error_upload: "Сбой ИИ-вырезки: ",
       error_submit: "Ошибка передачи: ",
@@ -40,6 +46,9 @@
       error_empty: "Витрина пуста",
       zone_ears: "Уши",
       zone_eyes: "Глаза",
+      upload_pet_title: "Загрузите фото питомца",
+      upload_pet_desc: "Выберите качественную фотографию питомца, смотрящего вперед",
+      choose_file: "Выбрать файл",
     },
     en: {
       brand_title: "Collage Editor",
@@ -53,6 +62,7 @@
       loading_item: "Syncing item...",
       loading_upload: "AI removing background...",
       loading_render: "Baking layers on AI canvas...",
+      loading_pet: "AI cropping pet photo...",
       error_switch: "Switch error: ",
       error_upload: "AI cutout failed: ",
       error_submit: "Submit error: ",
@@ -61,6 +71,9 @@
       error_empty: "Showcase is empty",
       zone_ears: "Ears",
       zone_eyes: "Eyes",
+      upload_pet_title: "Upload Pet Photo",
+      upload_pet_desc: "Choose a clear photo of your pet facing the camera",
+      choose_file: "Choose File",
     },
   };
 
@@ -104,7 +117,8 @@
 
   const params = new URLSearchParams(window.location.search);
   const sessionToken = params.get("token");
-  const BASE_API_URL = "https://tackle-unvisited-doorbell.ngrok-free.dev";
+  const urlApiParam = params.get("api_url");
+  const BASE_API_URL = urlApiParam ? urlApiParam : "https://tackle-unvisited-doorbell.ngrok-free.dev";
 
   let W = 1024;
   let H = 1024;
@@ -142,8 +156,10 @@
 
   let globalAssetsPack = [];
   let currentAssetIndex = 0;
-  let accumulatedActions = 30;
+  let accumulatedActions = 0;
   let selectedTrack = 1;
+  let tariffMultiplier = 10;
+  let freeAttemptAvailable = true;
 
   const smartZones = [
     { x: W * 0.5, y: H * 0.25, label: "ears" },
@@ -187,30 +203,33 @@
   }
 
   function draw() {
-    if (!images.bg || !images.item) return;
     ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(images.bg, 0, 0, W, H);
-
-    var itemW = images.item.width;
-    var itemH = images.item.height;
-
-    ctx.save();
-    ctx.translate(state.x, state.y);
-    ctx.rotate((state.angle * Math.PI) / 180);
-    ctx.scale(state.scale, state.scale);
-
-    var aspect = itemW / itemH;
-    var targetW, targetH;
-    if (itemW > itemH) {
-      targetW = 358;
-      targetH = 358 / aspect;
-    } else {
-      targetH = 358;
-      targetW = 358 * aspect;
+    if (images.bg) {
+      ctx.drawImage(images.bg, 0, 0, W, H);
     }
 
-    ctx.drawImage(images.item, -targetW / 2, -targetH / 2, targetW, targetH);
-    ctx.restore();
+    if (images.item) {
+      var itemW = images.item.width;
+      var itemH = images.item.height;
+
+      ctx.save();
+      ctx.translate(state.x, state.y);
+      ctx.rotate((state.angle * Math.PI) / 180);
+      ctx.scale(state.scale, state.scale);
+
+      var aspect = itemW / itemH;
+      var targetW, targetH;
+      if (itemW > itemH) {
+        targetW = 358;
+        targetH = 358 / aspect;
+      } else {
+        targetH = 358;
+        targetW = 358 * aspect;
+      }
+
+      ctx.drawImage(images.item, -targetW / 2, -targetH / 2, targetW, targetH);
+      ctx.restore();
+    }
   }
 
   // Smart Snap Magnet logic with LERP
@@ -245,7 +264,7 @@
       e.preventDefault();
       var touches = e.touches;
       
-      // Sycn targetState to state on start to avoid jumping if lerp was running
+      // Sync targetState to state on start to avoid jumping if lerp was running
       targetState.x = state.x;
       targetState.y = state.y;
       targetState.scale = state.scale;
@@ -292,12 +311,11 @@
         const wantedY = gestureStart.y + deltaFingerY;
 
         if (tState.isSnapped) {
-          // Calculate distance between current finger position and snapped zone
           const zone = smartZones[tState.snappedZoneIndex];
           const distToZone = Math.sqrt(Math.pow(wantedX - zone.x, 2) + Math.pow(wantedY - zone.y, 2));
           
           if (distToZone > 65) {
-            // Unsnap!
+            // Unsnap
             tState.isSnapped = false;
             tState.snappedZoneIndex = -1;
             tState.startX = touches[0].clientX;
@@ -313,7 +331,6 @@
           targetState.y = wantedY;
           constrainPosition(targetState);
           
-          // Check if we hit a smart zone
           const zoneIdx = checkSmartZones();
           if (zoneIdx !== -1) {
             tState.isSnapped = true;
@@ -450,6 +467,7 @@
     };
   }
 
+  // Kinetic Swiper & Focus logic
   function updateCarouselFocus() {
     if (!assetsScrollLane) return;
     var laneRect = assetsScrollLane.getBoundingClientRect();
@@ -470,7 +488,7 @@
 
     cards.forEach(function (card) {
       card.style.transform = "scale(0.9)";
-      card.style.opacity = "0.5";
+      card.style.opacity = "0.55";
       card.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
       card.style.borderColor = "";
     });
@@ -479,7 +497,7 @@
       closestCard.style.transform = "scale(1.1)";
       closestCard.style.opacity = "1";
       closestCard.style.boxShadow = "0 0 20px var(--accent-glow)";
-      closestCard.style.borderColor = "#0ea5e9";
+      closestCard.style.borderColor = "#6C63FF";
     }
   }
 
@@ -501,8 +519,14 @@
     bottomSheet.classList.add("open");
     hapticImpact("medium");
     if (invoiceBlock) {
-      var price = currentLang === "en" ? 20 : accumulatedActions;
-      invoiceBlock.textContent = (currentLang === "en" ? "25 Actions / " : "") + price + " ⭐️";
+      if (freeAttemptAvailable) {
+        invoiceBlock.innerHTML = `<span style="color:#10B981;">FREE TRIAL</span>`;
+      } else {
+        // Базовая стоимость 3 действия (12 сек) + количество аксессуаров
+        var totalActions = 3 + accumulatedActions;
+        var computedStars = totalActions * tariffMultiplier;
+        invoiceBlock.textContent = computedStars + " ⭐️";
+      }
     }
     generateTracks();
   }
@@ -518,16 +542,17 @@
     if (!tracksLane) return;
     var categories = ["liveportrait", "sadtalker"];
     var trackLabels = {
-      ru: ["🎬 Track #1", "🎬 Track #2"],
-      en: ["🎬 Track #1", "🎬 Track #2"]
+      ru: ["🎬 Трек #1 (Мафия)", "🎬 Трек #2 (Рэпер)", "🎬 Трек #3 (Фэнтези)"],
+      en: ["🎬 Track #1 (Mafia)", "🎬 Track #2 (Rapper)", "🎬 Track #3 (Fantasy)"]
     };
     tracksLane.innerHTML = "";
     var labels = trackLabels[currentLang] || trackLabels.ru;
-    categories.forEach(function (cat, idx) {
+    
+    labels.forEach(function (label, idx) {
       var btn = document.createElement("button");
       btn.className = "bs-track" + (idx === 0 ? " active" : "");
       btn.setAttribute("data-track", String(idx + 1));
-      btn.textContent = labels[idx] || ("Track #" + (idx + 1));
+      btn.textContent = label;
       tracksLane.appendChild(btn);
     });
     selectedTrack = 1;
@@ -593,6 +618,17 @@
           setError("");
           closeBottomSheet();
           hapticImpact("heavy");
+          
+          // Отправка данных через Telegram WebApp
+          try {
+            if (tg && typeof tg.sendData === "function") {
+              tg.sendData(JSON.stringify({
+                status: "render_started",
+                task_id: state_data && state_data.task_id
+              }));
+            }
+          } catch (_) {}
+          
           if (tg && typeof tg.close === "function") {
             setTimeout(function () { tg.close(); }, 400);
           }
@@ -609,6 +645,58 @@
     });
   }
 
+  // Pet photo uploader overlay logic
+  function initPetPhotoUploader() {
+    if (!petUploadBtn || !petPhotoInput) return;
+
+    petUploadBtn.addEventListener('touchstart', function (e) {
+      e.preventDefault();
+      petPhotoInput.click();
+      hapticImpact("light");
+    });
+
+    petPhotoInput.onchange = function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+
+      setError(__("loading_pet"));
+      var reader = new FileReader();
+      reader.onload = async function (evt) {
+        var base64Raw = evt.target.result;
+        try {
+          var response = await fetch(BASE_API_URL + "/upload_pet_photo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              token: sessionToken,
+              image_b64: base64Raw,
+            }),
+          });
+
+          if (!response.ok) throw new Error("AI pet photo cropping failed.");
+          var resData = await response.json();
+
+          // Подгружаем кадрированное квадратное фото питомца как фон
+          var bgImg = await loadImage(resData.pet_b64);
+          images.bg = bgImg;
+
+          // Скрываем оверлей загрузки
+          if (petUploadOverlay) {
+            petUploadOverlay.classList.add("hidden");
+          }
+
+          // Активируем кнопку «Готово»
+          doneBtn.disabled = false;
+          setError("");
+          hapticImpact("medium");
+        } catch (err) {
+          setError(err.message || "Pet upload error.");
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+
   // Gyroscope Parallax variables
   const targetTilt = { x: 0, y: 0 };
   const currentTilt = { x: 0, y: 0 };
@@ -621,11 +709,10 @@
         var gamma = e.gamma || 0; // Left-to-right tilt
         var beta = e.beta || 0;   // Front-to-back tilt
         
-        // Clamp orientation angles to avoid excessive scaling
         var clampedGamma = Math.max(-25, Math.min(25, gamma));
         var clampedBeta = Math.max(-25, Math.min(25, beta));
         
-        targetTilt.x = (clampedGamma / 25) * 16; // translation in pixels
+        targetTilt.x = (clampedGamma / 25) * 16;
         targetTilt.y = (clampedBeta / 25) * 16;
       },
       { passive: true }
@@ -634,7 +721,6 @@
 
   // Continuous LERP render tick loop (60 FPS)
   function tick() {
-    // ⚡ LERP (Linear Interpolation) factors
     const LERP_FACTOR = 0.22;
     const TILT_LERP = 0.08;
 
@@ -696,12 +782,30 @@
         throw new Error(__("error_empty"));
       }
 
-      accumulatedActions = storeData.accumulated_actions || 30;
+      accumulatedActions = storeData.accumulated_actions || 0;
+      tariffMultiplier = storeData.tariff_multiplier || 10;
+      freeAttemptAvailable = storeData.free_attempt_available !== false;
 
-      var bgImg = await loadImage(storeData.bg);
+      // Если фон передан с сервера (например, пользователь открывает Web App повторно)
+      if (storeData.bg) {
+        var bgImg = await loadImage(storeData.bg);
+        images.bg = bgImg;
+        
+        // Скрываем оверлей загрузки
+        if (petUploadOverlay) {
+          petUploadOverlay.classList.add("hidden");
+        }
+        doneBtn.disabled = false;
+      } else {
+        // Показываем оверлей загрузки фотографии питомца
+        if (petUploadOverlay) {
+          petUploadOverlay.classList.remove("hidden");
+        }
+        doneBtn.disabled = true;
+      }
+
+      // Загружаем первый ассет по умолчанию
       var itemImg = await loadImage(globalAssetsPack[0].b64);
-
-      images.bg = bgImg;
       images.item = itemImg;
 
       targetState.x = W / 2;
@@ -712,7 +816,7 @@
       var fitScale = maxStartSize / Math.max(itemImg.width, itemImg.height);
       targetState.scale = clampScale(fitScale);
 
-      // Instantly sync initial state to avoid slider effect on first load
+      // Instantly sync initial state
       state.x = targetState.x;
       state.y = targetState.y;
       state.angle = targetState.angle;
@@ -723,11 +827,11 @@
       initCustomItemUploader();
       initBottomSheet();
       initOrientationParallax();
+      initPetPhotoUploader();
 
       // Launch continuous 60FPS tick rendering
       requestAnimationFrame(tick);
 
-      doneBtn.disabled = false;
       setError("");
     } catch (err) {
       setError(err.message || "Canvas build error.");
